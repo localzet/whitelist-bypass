@@ -34,12 +34,32 @@ func main() {
 	upstreamUser := flag.String("upstream-user", "", "upstream SOCKS5 username")
 	upstreamPass := flag.String("upstream-pass", "", "upstream SOCKS5 password")
 	egressConfig := flag.String("egress-config", "", "creator mode: JSON egress profile config")
+	serviceControl := flag.Bool("service-control", false, "use this call as a control channel and request a work call")
+	serviceUserID := flag.String("service-user-id", "", "user id sent in service control messages")
+	serviceCookieFile := flag.String("service-cookie-file", "", "optional cookies JSON file sent through the service call")
+	serviceCookiePlatform := flag.String("service-cookie-platform", "telemost", "platform for service cookie submit")
+	serviceWorkPlatform := flag.String("service-work-platform", "telemost", "platform requested for the work call")
+	serviceRequestID := flag.String("service-request-id", "", "idempotency key for the service session request")
+	serviceTunnelMode := flag.String("service-tunnel-mode", "video", "tunnel mode requested for the work call")
 	flag.String("local-ip", "", "local IP address (unused, passed via hook)")
 	flag.Parse()
 
 	if *mode == "" {
 		fmt.Fprintf(os.Stderr, "Usage: relay --mode dc-joiner|dc-creator|vk-video-joiner|vk-video-creator|telemost-video-joiner|telemost-video-creator\n")
 		os.Exit(1)
+	}
+	serviceCfg := serviceControlConfig{
+		Enabled:        *serviceControl,
+		UserID:         *serviceUserID,
+		RequestID:      *serviceRequestID,
+		EgressID:       *egressID,
+		CookieFile:     *serviceCookieFile,
+		CookiePlatform: *serviceCookiePlatform,
+		WorkPlatform:   *serviceWorkPlatform,
+		TunnelMode:     *serviceTunnelMode,
+	}
+	if err := serviceCfg.normalize(); err != nil {
+		log.Fatalf("[config] %v", err)
 	}
 	egressRegistry := loadEgressRegistry(*egressConfig, *upstreamSocks, *upstreamUser, *upstreamPass)
 
@@ -86,13 +106,22 @@ func main() {
 			bridgeMu.Lock()
 			defer bridgeMu.Unlock()
 			if bridge == nil {
-				bridge = tunnel.NewRelayBridgeWithAuth(tun, "joiner", readBuf, log.Printf, *socksUser, *socksPass)
-				bridge.SetRequestedEgressID(*egressID)
+				if serviceCfg.Enabled {
+					bridge = tunnel.NewRelayBridge(tun, "joiner", readBuf, log.Printf)
+					configureServiceBridge(bridge, serviceCfg, func(line string) { fmt.Println(line) })
+				} else {
+					bridge = tunnel.NewRelayBridgeWithAuth(tun, "joiner", readBuf, log.Printf, *socksUser, *socksPass)
+					bridge.SetRequestedEgressID(*egressID)
+				}
 				if onConfigAck != nil {
 					bridge.SetOnConfigAck(onConfigAck)
 				}
 				bridge.SetPersistentListener(true)
 				bridge.MarkReady()
+				if serviceCfg.Enabled {
+					go requestServiceSession(bridge, serviceCfg)
+					return
+				}
 				addr := fmt.Sprintf("%s:%d", *socksHost, *socksPort)
 				go func() {
 					if err := bridge.ListenSOCKS(addr); err != nil {

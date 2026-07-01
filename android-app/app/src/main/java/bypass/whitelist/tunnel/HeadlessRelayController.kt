@@ -20,6 +20,8 @@ class HeadlessRelayController(
     private val onLog: ParamCallback<String>,
     private val onStatus: ParamCallback<VpnStatus>,
     private val onCaptchaUrl: ParamCallback<String>? = null,
+    private val serviceControl: ServiceControlConfig? = null,
+    private val onServiceSessionReady: ParamCallback<ServiceSessionReady>? = null,
 ) {
     private var process: Process? = null
     private var thread: Thread? = null
@@ -64,8 +66,13 @@ class HeadlessRelayController(
                     "--socks-user", SocksAuth.user,
                     "--socks-pass", SocksAuth.pass
                 )
-                Prefs.activeEgressId.takeIf { it.isNotBlank() }?.let {
-                    args += listOf("--egress-id", it)
+                if (serviceControl == null) {
+                    Prefs.activeEgressId.takeIf { it.isNotBlank() }?.let {
+                        args += listOf("--egress-id", it)
+                    }
+                }
+                serviceControl?.let { config ->
+                    args += config.toProcessArgs()
                 }
                 val processBuilder = ProcessBuilder(args)
                 processBuilder.redirectErrorStream(true)
@@ -91,6 +98,11 @@ class HeadlessRelayController(
                             Log.e("RELAY", "DNS resolve failed for $hostname", e)
                             writeStdin("")
                         }
+                    } else if (line.startsWith(SERVICE_SESSION_READY_MARKER)) {
+                        val payload = line.removePrefix(SERVICE_SESSION_READY_MARKER)
+                        runCatching { ServiceSessionReady.fromJson(JSONObject(payload)) }
+                            .onSuccess { onServiceSessionReady?.invoke(it) }
+                            .onFailure { onLog.invoke("Invalid service session response: ${it.message}") }
                     } else if (line.startsWith("STATUS:")) {
                         val status = line.removePrefix("STATUS:")
                         Log.d("RELAY", "status: $status")
@@ -194,5 +206,9 @@ class HeadlessRelayController(
         } catch (e: Exception) {
             Log.e("RELAY", "writeStdin error: ${e.message}")
         }
+    }
+
+    private companion object {
+        const val SERVICE_SESSION_READY_MARKER = "SERVICE_SESSION_READY:"
     }
 }
