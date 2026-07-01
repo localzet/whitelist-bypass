@@ -66,6 +66,11 @@ if (savedSettingsRaw) {
     input('dns').value = saved.dns ?? '1.1.1.1,8.8.8.8';
     input('noTun').checked = Boolean(saved.noTun);
     input('dualTrack').checked = Boolean(saved.dualTrack);
+    input('serviceControl').checked = Boolean(saved.serviceControl);
+    input('serviceUserId').value = saved.serviceUserId ?? '';
+    input('serviceCookieFile').value = saved.serviceCookieFile ?? '';
+    select('serviceCookiePlatform').value = saved.serviceCookiePlatform ?? 'telemost';
+    select('serviceWorkPlatform').value = saved.serviceWorkPlatform ?? 'telemost';
   } catch {
     localStorage.removeItem('joiner:lastSettings');
   }
@@ -161,6 +166,11 @@ startBtn.addEventListener('click', async () => {
     dns: input('dns').value.trim() || '1.1.1.1,8.8.8.8',
     noTun: input('noTun').checked,
     dualTrack: input('dualTrack').checked,
+    serviceControl: input('serviceControl').checked,
+    serviceUserId: input('serviceUserId').value.trim(),
+    serviceCookieFile: input('serviceCookieFile').value.trim(),
+    serviceCookiePlatform: select('serviceCookiePlatform').value,
+    serviceWorkPlatform: select('serviceWorkPlatform').value,
   };
   localStorage.setItem('joiner:lastSettings', JSON.stringify(settings));
   const r = await bridge.start(settings);

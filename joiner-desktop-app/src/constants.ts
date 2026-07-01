@@ -37,4 +37,9 @@ export interface JoinerSettings {
   dns: string;
   noTun: boolean;
   dualTrack: boolean;
+  serviceControl: boolean;
+  serviceUserId: string;
+  serviceCookieFile: string;
+  serviceCookiePlatform: JoinerPlatform;
+  serviceWorkPlatform: JoinerPlatform;
 }

@@ -10,10 +10,19 @@ let joinerProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 let captchaWindow: BrowserWindow | null = null;
 let userRequestedStop = false;
+let switchingToWorkSession = false;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let retryCount = 0;
 let lastSettings: JoinerSettings | null = null;
 const MAX_RETRIES = 8;
+
+interface ServiceSessionReady {
+  requestId: string;
+  sessionId: string;
+  joinLink: string;
+  egressId: string;
+  ttlSeconds: number;
+}
 
 function openCaptchaWindow(url: string) {
   if (captchaWindow && !captchaWindow.isDestroyed()) {
@@ -63,6 +72,14 @@ function send(channel: string, payload: unknown) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(channel, payload);
   }
+}
+
+function detectPlatformFromLink(link: string): JoinerSettings['platform'] {
+  const lower = link.toLowerCase();
+  if (lower.startsWith('wbstream://') || lower.includes('stream.wb.ru')) return 'wbstream';
+  if (lower.includes('telemost.yandex')) return 'telemost';
+  if (lower.startsWith('dion://') || lower.includes('dion.vc')) return 'dion';
+  return 'vk';
 }
 
 function createWindow() {
@@ -119,6 +136,13 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
   if (settings.socksUser) args.push('--socks-user', settings.socksUser);
   if (settings.socksPass) args.push('--socks-pass', settings.socksPass);
   if (settings.egressId) args.push('--egress-id', settings.egressId);
+  if (settings.serviceControl) {
+    args.push('--service-control');
+    if (settings.serviceUserId) args.push('--service-user-id', settings.serviceUserId);
+    if (settings.serviceCookieFile) args.push('--service-cookie-file', settings.serviceCookieFile);
+    if (settings.serviceCookiePlatform) args.push('--service-cookie-platform', settings.serviceCookiePlatform);
+    if (settings.serviceWorkPlatform) args.push('--service-work-platform', settings.serviceWorkPlatform);
+  }
   if (noTun) args.push('--no-tun');
   if (settings.dualTrack && (settings.platform === 'vk' || settings.platform === 'wbstream')) {
     args.push('--dual-track');
@@ -148,7 +172,15 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
   const parseDiscoveryLine = (line: string) => {
     const listMarker = 'EGRESS_LIST:';
     const probeMarker = 'EGRESS_PROBE:';
+    const serviceMarker = 'SERVICE_SESSION_READY:';
     try {
+      const serviceAt = line.indexOf(serviceMarker);
+      if (serviceAt >= 0) {
+        const session = JSON.parse(line.slice(serviceAt + serviceMarker.length)) as ServiceSessionReady;
+        send(IPC.LOG, `[main] service returned work call ${session.sessionId} via ${session.egressId}\n`);
+        switchToWorkSession(session);
+        return;
+      }
       const listAt = line.indexOf(listMarker);
       if (listAt >= 0) {
         const payload = JSON.parse(line.slice(listAt + listMarker.length)) as { egresses: EgressDescriptor[] };
@@ -196,7 +228,7 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
     send(IPC.RUNNING, false);
     joinerProcess = null;
 
-    if (userRequestedStop || !lastSettings) return;
+    if (userRequestedStop || switchingToWorkSession || !lastSettings) return;
     if (retryCount >= MAX_RETRIES) {
       send(IPC.LOG, `[main] auto-reconnect: giving up after ${MAX_RETRIES} attempts\n`);
       return;
@@ -212,6 +244,31 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
     }, delayMs);
   });
   return { ok: true };
+}
+
+function switchToWorkSession(session: ServiceSessionReady) {
+  if (!lastSettings || !lastSettings.serviceControl) return;
+  const workSettings: JoinerSettings = {
+    ...lastSettings,
+    platform: detectPlatformFromLink(session.joinLink),
+    link: session.joinLink,
+    egressId: session.egressId,
+    serviceControl: false,
+  };
+  userRequestedStop = true;
+  switchingToWorkSession = true;
+  stopJoiner();
+  userRequestedStop = false;
+  lastSettings = workSettings;
+  setTimeout(() => {
+    switchingToWorkSession = false;
+    if (joinerProcess) return;
+    const result = spawnJoiner(workSettings);
+    if (!result.ok) {
+      send(IPC.LOG, `[main] work-call start failed: ${result.error}\n`);
+      send(IPC.STATUS, 'stopped');
+    }
+  }, 500);
 }
 
 ipcMain.handle(IPC.START, async (_e, settings: JoinerSettings) => {

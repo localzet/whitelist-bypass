@@ -83,6 +83,40 @@
           <input id="dualTrack" type="checkbox" />
           Dual-track
         </label>
+        <label class="check">
+          <input id="serviceControl" type="checkbox" />
+          Service-call control
+        </label>
+        <div class="row">
+          <label>
+            Service user ID
+            <input id="serviceUserId" type="text" placeholder="stable-user-id" />
+          </label>
+          <label>
+            Cookie JSON path
+            <input id="serviceCookieFile" type="text" placeholder="cookies-yandex.json" />
+          </label>
+        </div>
+        <div class="row">
+          <label>
+            Cookie platform
+            <select id="serviceCookiePlatform">
+              <option value="telemost" selected>Telemost</option>
+              <option value="vk">VK</option>
+              <option value="dion">DION</option>
+              <option value="wbstream">WB Stream</option>
+            </select>
+          </label>
+          <label>
+            Work platform
+            <select id="serviceWorkPlatform">
+              <option value="telemost" selected>Telemost</option>
+              <option value="vk">VK</option>
+              <option value="dion">DION</option>
+              <option value="wbstream">WB Stream</option>
+            </select>
+          </label>
+        </div>
         <div class="actions">
           <button id="start">Start</button>
           <button id="stop">Stop</button>

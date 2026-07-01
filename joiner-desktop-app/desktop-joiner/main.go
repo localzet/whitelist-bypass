@@ -9,6 +9,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -24,13 +26,13 @@ import (
 	"syscall"
 	"time"
 
-	joinerCommon "whitelist-bypass/relay/pion/headless-joiner-common"
 	"whitelist-bypass/relay/common"
+	"whitelist-bypass/relay/desktoptun"
 	"whitelist-bypass/relay/dion"
 	"whitelist-bypass/relay/pion"
+	joinerCommon "whitelist-bypass/relay/pion/headless-joiner-common"
 	"whitelist-bypass/relay/tunnel"
 	"whitelist-bypass/relay/wbstream"
-	"whitelist-bypass/relay/desktoptun"
 )
 
 type statusEmitter struct{}
@@ -102,6 +104,12 @@ func main() {
 	socksUser := flag.String("socks-user", "", "optional SOCKS5 username")
 	socksPass := flag.String("socks-pass", "", "optional SOCKS5 password")
 	egressID := flag.String("egress-id", "", "creator egress profile id")
+	serviceControl := flag.Bool("service-control", false, "use this call as a control channel and request a work call")
+	serviceUserID := flag.String("service-user-id", "", "user id sent in service control messages")
+	serviceCookieFile := flag.String("service-cookie-file", "", "optional cookies JSON file to send through the service call")
+	serviceCookiePlatform := flag.String("service-cookie-platform", "telemost", "platform for service cookie submit")
+	serviceWorkPlatform := flag.String("service-work-platform", "telemost", "platform requested for the work call")
+	serviceRequestID := flag.String("service-request-id", "", "idempotency key for the service session request")
 	resources := flag.String("resources", "default", "moderate | default | unlimited")
 	tunnelMode := flag.String("tunnel-mode", "video", "tunnel mode for WB Stream: video | dc")
 	vp8FPS := flag.Int("vp8-fps", 24, "VP8 frame rate")
@@ -113,6 +121,9 @@ func main() {
 
 	if *platform == "" || *link == "" {
 		log.Fatal("--platform and --link are required")
+	}
+	if *serviceControl && *serviceRequestID == "" {
+		*serviceRequestID = newRequestID()
 	}
 
 	switch *resources {
@@ -174,9 +185,9 @@ func main() {
 	tunReady := make(chan struct{})
 	var tunOnce sync.Once
 	var (
-		pendingMu      sync.Mutex
-		pending        []string
-		tunStarted     bool
+		pendingMu  sync.Mutex
+		pending    []string
+		tunStarted bool
 	)
 	bringUpTun := func() {
 		tunOnce.Do(func() {
@@ -242,6 +253,8 @@ func main() {
 		bridge   *tunnel.RelayBridge
 		bridgeMu sync.Mutex
 	)
+	serviceReadyCh := make(chan tunnel.SessionReady, 1)
+	serviceCookieAckCh := make(chan tunnel.CookieAck, 1)
 	onConnected := func(t tunnel.DataTunnel) {
 		readBuf := common.VP8BufSize
 		if _, ok := t.(*tunnel.DCTunnel); ok {
@@ -249,6 +262,43 @@ func main() {
 		}
 		bridgeMu.Lock()
 		defer bridgeMu.Unlock()
+		if *serviceControl {
+			if bridge != nil {
+				bridge.SwapTunnel(t)
+				log.Printf("[service] control tunnel swapped after reconnect")
+				return
+			}
+			bridge = tunnel.NewRelayBridge(t, "joiner", readBuf, log.Printf)
+			bridge.SetRequestedEgressID("")
+			bridge.SetOnCookieAck(func(ack tunnel.CookieAck) {
+				log.Printf("[service] cookie stored platform=%q request=%q", ack.Platform, ack.RequestID)
+				select {
+				case serviceCookieAckCh <- ack:
+				default:
+				}
+			})
+			bridge.SetOnSessionReady(func(session tunnel.SessionReady) {
+				payload, _ := json.Marshal(session)
+				fmt.Printf("SERVICE_SESSION_READY:%s\n", payload)
+				select {
+				case serviceReadyCh <- session:
+				default:
+				}
+			})
+			bridge.MarkReady()
+			go requestServiceSession(bridge, serviceControlConfig{
+				UserID:         *serviceUserID,
+				RequestID:      *serviceRequestID,
+				EgressID:       *egressID,
+				CookieFile:     *serviceCookieFile,
+				CookiePlatform: *serviceCookiePlatform,
+				WorkPlatform:   *serviceWorkPlatform,
+				TunnelMode:     *tunnelMode,
+			})
+			log.Printf("[service] control channel ready request=%q", *serviceRequestID)
+			return
+		}
+
 		// Reconnect: swap the new tunnel behind the persistent SOCKS
 		// listener instead of binding a second one
 		if bridge != nil {
@@ -295,6 +345,8 @@ func main() {
 	select {
 	case <-sig:
 		log.Printf("[main] shutting down")
+	case session := <-serviceReadyCh:
+		log.Printf("[service] work session ready id=%s egress=%s", session.SessionID, session.EgressID)
 	case <-tunnelLostCh:
 		log.Printf("[main] tunnel lost, exiting with code 2 to trigger auto-reconnect")
 		lost = true
@@ -485,6 +537,50 @@ func runDion(link, name string,
 		default:
 		}
 	}()
+}
+
+type serviceControlConfig struct {
+	UserID         string
+	RequestID      string
+	EgressID       string
+	CookieFile     string
+	CookiePlatform string
+	WorkPlatform   string
+	TunnelMode     string
+}
+
+func requestServiceSession(bridge *tunnel.RelayBridge, cfg serviceControlConfig) {
+	if strings.TrimSpace(cfg.CookieFile) != "" {
+		payload, err := os.ReadFile(cfg.CookieFile)
+		if err != nil {
+			log.Printf("[service] read cookies: %v", err)
+		} else {
+			bridge.SubmitCookies(tunnel.CookieSubmit{
+				RequestID: cfg.RequestID + "-cookies",
+				UserID:    cfg.UserID,
+				Platform:  cfg.CookiePlatform,
+				Format:    "json",
+				Payload:   string(payload),
+			})
+			log.Printf("[service] submitted cookies platform=%q request=%q", cfg.CookiePlatform, cfg.RequestID+"-cookies")
+		}
+	}
+	bridge.RequestSession(tunnel.SessionCreateRequest{
+		RequestID: cfg.RequestID,
+		UserID:    cfg.UserID,
+		EgressID:  cfg.EgressID,
+		Platform:  cfg.WorkPlatform,
+		Mode:      cfg.TunnelMode,
+	})
+	log.Printf("[service] requested work session platform=%q egress=%q request=%q", cfg.WorkPlatform, cfg.EgressID, cfg.RequestID)
+}
+
+func newRequestID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("req-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
 }
 
 func resolveHostname(hostname string) (string, error) {
