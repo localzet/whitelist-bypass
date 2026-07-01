@@ -46,6 +46,7 @@
     ],
     "mac": {
       "target": "dmg",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "icon": "resources/icon.icns",
       "extraResources": [
         {

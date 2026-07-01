@@ -1,8 +1,11 @@
 #!/bin/sh
 set -e
 
-export ANDROID_HOME="$HOME/Library/Android/sdk"
-export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/29.0.14206865"
+ANDROID_NDK_VERSION="${ANDROID_NDK_VERSION:-29.0.14206865}"
+: "${ANDROID_HOME:=$HOME/Library/Android/sdk}"
+: "${ANDROID_NDK_HOME:=$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION}"
+export ANDROID_HOME
+export ANDROID_NDK_HOME
 export CGO_LDFLAGS="-Wl,-z,max-page-size=16384"
 export PATH="$PATH:/opt/homebrew/bin:$HOME/go/bin"
 

@@ -1,0 +1,349 @@
+name: Build release installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to attach artifacts to, for example v0.3.8'
+        required: false
+        type: string
+      draft:
+        description: 'Create or update the release as draft'
+        required: false
+        default: false
+        type: boolean
+      prerelease:
+        description: 'Mark the release as prerelease'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}-${{ inputs.tag || '' }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: '1.26.1'
+  NODE_VERSION: '22'
+  JAVA_VERSION: '17'
+  ANDROID_NDK_VERSION: '29.0.14206865'
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;${ANDROID_NDK_VERSION}"
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      - name: Build Android APK
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION"
+          export CGO_LDFLAGS="-Wl,-z,max-page-size=16384"
+          chmod +x ./android-app/gradlew
+          ./build-go.sh
+          ./build-android.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: prebuilts/whitelist-bypass.apk
+          if-no-files-found: error
+
+  cli:
+    name: Headless CLI bundles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install packagers
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Build CLI bundles
+        run: ./build-cli.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-bundles
+          path: prebuilts/whitelist-bypass-cli-*.zip
+          if-no-files-found: error
+
+  creator:
+    name: Creator ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            goos: linux
+            goarch: amd64
+            ext: ''
+          - os: windows-latest
+            platform: win
+            arch: x64
+            goos: windows
+            goarch: amd64
+            ext: '.exe'
+          - os: windows-latest
+            platform: win
+            arch: ia32
+            goos: windows
+            goarch: '386'
+            ext: '.exe'
+          - os: macos-latest
+            platform: mac
+            arch: universal
+            goos: darwin
+            goarch: universal
+            ext: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: creator-app/package-lock.json
+
+      - name: Install Linux packaging dependencies
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - name: Build creator Go payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            GOOS=darwin GOARCH=amd64 go -C relay build -trimpath -ldflags="-s -w" -o relay-darwin-amd64 .
+            GOOS=darwin GOARCH=arm64 go -C relay build -trimpath -ldflags="-s -w" -o relay-darwin-arm64 .
+            lipo -create -output relay/relay-darwin relay/relay-darwin-amd64 relay/relay-darwin-arm64
+
+            for component in vk telemost wbstream dion; do
+              GOOS=darwin GOARCH=amd64 go -C "headless/$component" build -trimpath -ldflags="-s -w" -o "../headless-$component-darwin-amd64" .
+              GOOS=darwin GOARCH=arm64 go -C "headless/$component" build -trimpath -ldflags="-s -w" -o "../headless-$component-darwin-arm64" .
+              lipo -create -output "headless/headless-$component-darwin" "headless/headless-$component-darwin-amd64" "headless/headless-$component-darwin-arm64"
+            done
+            exit 0
+          fi
+
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C relay build -trimpath -ldflags="-s -w" -o "relay-bundle${{ matrix.ext }}" .
+          for component in vk telemost wbstream dion; do
+            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C "headless/$component" build -trimpath -ldflags="-s -w" -o "../headless-$component-bundle${{ matrix.ext }}" .
+          done
+
+      - name: Build Creator installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix creator-app
+          npm run build --prefix creator-app
+          cd creator-app
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            npx electron-builder --mac --universal --publish never
+          else
+            npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+          fi
+          cd ..
+          ./clean-prebuilts.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: creator-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            prebuilts/WhitelistBypass Creator-*
+            prebuilts/WhitelistBypass*Creator*
+          if-no-files-found: error
+
+  joiner:
+    name: Desktop Joiner ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            goos: linux
+            goarch: amd64
+            ext: ''
+          - os: windows-latest
+            platform: win
+            arch: x64
+            goos: windows
+            goarch: amd64
+            wintun_arch: amd64
+            ext: '.exe'
+          - os: windows-latest
+            platform: win
+            arch: ia32
+            goos: windows
+            goarch: '386'
+            wintun_arch: x86
+            ext: '.exe'
+          - os: macos-latest
+            platform: mac
+            arch: universal
+            goos: darwin
+            goarch: universal
+            ext: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: joiner-desktop-app/package-lock.json
+
+      - name: Install Linux packaging dependencies
+        if: matrix.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
+      - name: Build joiner Go payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd joiner-desktop-app/desktop-joiner
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o desktop-joiner-darwin-amd64 .
+            GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o desktop-joiner-darwin-arm64 .
+            lipo -create -output desktop-joiner-darwin desktop-joiner-darwin-amd64 desktop-joiner-darwin-arm64
+            exit 0
+          fi
+
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags="-s -w" -o "desktop-joiner-bundle${{ matrix.ext }}" .
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            curl -L -o wintun.zip https://www.wintun.net/builds/wintun-0.14.1.zip
+            7z e -y wintun.zip "wintun/bin/${{ matrix.wintun_arch }}/wintun.dll" >/dev/null
+            mv wintun.dll wintun-bundle.dll
+          else
+            chmod +x desktop-joiner-bundle
+          fi
+
+      - name: Build Joiner installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --prefix joiner-desktop-app
+          npm run build --prefix joiner-desktop-app
+          cd joiner-desktop-app
+          if [ "${{ matrix.platform }}" = "mac" ]; then
+            npx electron-builder --mac --universal --publish never
+          else
+            npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+          fi
+          cd ..
+          ./clean-prebuilts.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: joiner-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            prebuilts/WhitelistBypass Joiner-*
+            prebuilts/WhitelistBypass*Joiner*
+          if-no-files-found: error
+
+  ios:
+    name: iOS unsigned IPA
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      - name: Build unsigned IPA
+        run: ./build-ios.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: prebuilts/whitelist-bypass-proxy.ipa
+          if-no-files-found: error
+
+  release:
+    name: Attach artifacts to GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - android
+      - cli
+      - creator
+      - joiner
+      - ios
+    if: startsWith(github.ref, 'refs/tags/') || inputs.tag != ''
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          ls -lh
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ inputs.prerelease || false }}
+          files: dist/**
