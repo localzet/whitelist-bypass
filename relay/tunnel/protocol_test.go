@@ -46,3 +46,27 @@ func TestSessionControlPayloads(t *testing.T) {
 		t.Fatalf("session ready round trip = %+v, %v", ready, ok)
 	}
 }
+
+func TestCookiePayloadsAllowLargerControlBody(t *testing.T) {
+	largePayload := make([]byte, MaxControlPayload+128)
+	for i := range largePayload {
+		largePayload[i] = 'x'
+	}
+	want := CookieSubmit{
+		RequestID: "cookie-1",
+		UserID:    "user-1",
+		Platform:  "telemost",
+		Format:    "json",
+		Payload:   string(largePayload),
+	}
+	got, ok := DecodeCookieSubmit(EncodeCookieSubmitPayload(want))
+	if !ok || got != want {
+		t.Fatalf("cookie submit round trip = %+v, %v", got, ok)
+	}
+
+	ackWant := CookieAck{RequestID: "cookie-1", Platform: "telemost", Stored: true}
+	ack, ok := DecodeCookieAck(EncodeCookieAckPayload(ackWant))
+	if !ok || ack != ackWant {
+		t.Fatalf("cookie ack round trip = %+v, %v", ack, ok)
+	}
+}

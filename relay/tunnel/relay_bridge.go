@@ -85,6 +85,12 @@ type RelayBridge struct {
 
 	onSessionReadyMu sync.Mutex
 	onSessionReady   func(SessionReady)
+
+	onCookieSubmitMu sync.Mutex
+	onCookieSubmit   func(CookieSubmit) (CookieAck, error)
+
+	onCookieAckMu sync.Mutex
+	onCookieAck   func(CookieAck)
 }
 
 func (rb *RelayBridge) SetOnPeerConfig(fn func(fps, batch, trackCount int)) {
@@ -113,6 +119,22 @@ func (rb *RelayBridge) SetOnSessionReady(fn func(SessionReady)) {
 
 func (rb *RelayBridge) RequestSession(request SessionCreateRequest) {
 	rb.send(ControlConnID, MsgSessionCreate, EncodeSessionCreatePayload(request))
+}
+
+func (rb *RelayBridge) SetOnCookieSubmit(fn func(CookieSubmit) (CookieAck, error)) {
+	rb.onCookieSubmitMu.Lock()
+	rb.onCookieSubmit = fn
+	rb.onCookieSubmitMu.Unlock()
+}
+
+func (rb *RelayBridge) SetOnCookieAck(fn func(CookieAck)) {
+	rb.onCookieAckMu.Lock()
+	rb.onCookieAck = fn
+	rb.onCookieAckMu.Unlock()
+}
+
+func (rb *RelayBridge) SubmitCookies(cookie CookieSubmit) {
+	rb.send(ControlConnID, MsgCookieSubmit, EncodeCookieSubmitPayload(cookie))
 }
 
 func NewRelayBridgeWithAuth(tunnel DataTunnel, mode string, readBuf int, logFn func(string, ...any), socksUser, socksPass string) *RelayBridge {
@@ -506,6 +528,46 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 				rb.onSessionReadyMu.Unlock()
 				if cb != nil {
 					cb(session)
+				}
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgCookieSubmit {
+			if rb.mode == "creator" {
+				cookie, ok := DecodeCookieSubmit(payload)
+				if !ok {
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("bad_cookie_submit", "invalid cookie payload"))
+					return
+				}
+				rb.onCookieSubmitMu.Lock()
+				cb := rb.onCookieSubmit
+				rb.onCookieSubmitMu.Unlock()
+				if cb == nil {
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("cookie_vault_unavailable", "cookie storage is not available"))
+					return
+				}
+				ack, err := cb(cookie)
+				if err != nil {
+					rb.logFn("relay: cookie submit failed platform=%q request=%q: %s", cookie.Platform, cookie.RequestID, common.MaskError(err))
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("cookie_submit_failed", common.MaskError(err)))
+					return
+				}
+				rb.send(ControlConnID, MsgCookieAck, EncodeCookieAckPayload(ack))
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgCookieAck {
+			if rb.mode == "joiner" {
+				ack, ok := DecodeCookieAck(payload)
+				if !ok {
+					rb.logFn("relay: invalid cookie ack")
+					return
+				}
+				rb.onCookieAckMu.Lock()
+				cb := rb.onCookieAck
+				rb.onCookieAckMu.Unlock()
+				if cb != nil {
+					cb(ack)
 				}
 			}
 			return

@@ -24,11 +24,14 @@ const (
 	MsgEgressProbeResult  byte = 0x10
 	MsgSessionCreate      byte = 0x11
 	MsgSessionReady       byte = 0x12
+	MsgCookieSubmit       byte = 0x13
+	MsgCookieAck          byte = 0x14
 )
 
 const ControlConnID uint32 = 0
 const ControlProtocolVersion = 1
 const MaxControlPayload = 4096
+const MaxCookiePayload = 65536
 
 type DataTunnel interface {
 	SendData(data []byte)
@@ -88,6 +91,20 @@ type SessionReady struct {
 	JoinLink   string `json:"joinLink"`
 	EgressID   string `json:"egressId"`
 	TTLSeconds int64  `json:"ttlSeconds"`
+}
+
+type CookieSubmit struct {
+	RequestID string `json:"requestId"`
+	UserID    string `json:"userId,omitempty"`
+	Platform  string `json:"platform"`
+	Format    string `json:"format"`
+	Payload   string `json:"payload"`
+}
+
+type CookieAck struct {
+	RequestID string `json:"requestId"`
+	Platform  string `json:"platform"`
+	Stored    bool   `json:"stored"`
 }
 
 func EncodeClientHello(requestedEgressID string) []byte {
@@ -215,8 +232,36 @@ func DecodeSessionReady(payload []byte) (SessionReady, bool) {
 	return msg, msg.RequestID != "" && msg.SessionID != "" && msg.JoinLink != "" && msg.EgressID != "" && msg.TTLSeconds > 0
 }
 
+func EncodeCookieSubmitPayload(cookie CookieSubmit) []byte {
+	return encodeControlJSON(cookie)
+}
+
+func DecodeCookieSubmit(payload []byte) (CookieSubmit, bool) {
+	var msg CookieSubmit
+	if !decodeControlJSONWithLimit(payload, &msg, MaxCookiePayload) {
+		return msg, false
+	}
+	return msg, msg.RequestID != "" && msg.Platform != "" && msg.Format != "" && msg.Payload != ""
+}
+
+func EncodeCookieAckPayload(ack CookieAck) []byte {
+	return encodeControlJSON(ack)
+}
+
+func DecodeCookieAck(payload []byte) (CookieAck, bool) {
+	var msg CookieAck
+	if !decodeControlJSON(payload, &msg) {
+		return msg, false
+	}
+	return msg, msg.RequestID != "" && msg.Platform != ""
+}
+
 func decodeControlJSON(payload []byte, value any) bool {
-	if len(payload) == 0 || len(payload) > MaxControlPayload {
+	return decodeControlJSONWithLimit(payload, value, MaxControlPayload)
+}
+
+func decodeControlJSONWithLimit(payload []byte, value any, limit int) bool {
+	if len(payload) == 0 || len(payload) > limit {
 		return false
 	}
 	return json.Unmarshal(payload, value) == nil
