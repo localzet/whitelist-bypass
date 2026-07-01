@@ -1,13 +1,37 @@
 #!/bin/sh
 set -eu
 
-: "${VK_TOKEN:?VK_TOKEN is required}"
-: "${VK_GROUP_ID:?VK_GROUP_ID is required}"
-
 BINS_DIR="${BINS_DIR:-/opt/wlb/bin}"
 SESSIONS_DIR="${SESSIONS_DIR:-/data/sessions}"
 RESOURCES="${RESOURCES:-default}"
 EGRESS_CONFIG="${EGRESS_CONFIG:-}"
+
+if [ "${SERVICE_MODE:-}" = "creator-service" ]; then
+    : "${USER_ID:?USER_ID is required}"
+    : "${VAULT_KEY_BASE64:?VAULT_KEY_BASE64 is required}"
+    SERVICE_COOKIES="${SERVICE_COOKIES:-/data/cookies-wbstream.json}"
+    VAULT_DIR="${VAULT_DIR:-/data/vault}"
+    WORK_PLATFORM="${WORK_PLATFORM:-telemost}"
+    SERVICE_WRITE_FILE="${SERVICE_WRITE_FILE:-/data/service-call.txt}"
+
+    set -- \
+        --user-id "$USER_ID" \
+        --service-cookies "$SERVICE_COOKIES" \
+        --vault-dir "$VAULT_DIR" \
+        --vault-key-base64 "$VAULT_KEY_BASE64" \
+        --bins-dir "$BINS_DIR" \
+        --sessions-dir "$SESSIONS_DIR" \
+        --resources "$RESOURCES" \
+        --work-platform "$WORK_PLATFORM" \
+        --write-file "$SERVICE_WRITE_FILE"
+
+    [ -n "$EGRESS_CONFIG" ] && set -- "$@" --egress-config "$EGRESS_CONFIG"
+    [ -n "${SERVICE_ROOM:-}" ] && set -- "$@" --service-room "$SERVICE_ROOM"
+    exec /usr/local/bin/headless-creator-service "$@"
+fi
+
+: "${VK_TOKEN:?VK_TOKEN is required}"
+: "${VK_GROUP_ID:?VK_GROUP_ID is required}"
 
 VK_COOKIES_DEFAULT="/data/cookies-vk.json"
 TM_COOKIES_DEFAULT="/data/cookies-yandex.json"

@@ -5,6 +5,12 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    # To run the call-carried creator service instead of the VK bot, set in .env:
+    # SERVICE_MODE=creator-service
+    # USER_ID=<stable-user-id>
+    # VAULT_KEY_BASE64=<base64-encoded-32-byte-key>
+    # EGRESS_CONFIG=/config/egresses.json
+    # WORK_PLATFORM=telemost
     # Uncomment to reach a SOCKS5 VPN client running on the host via
     # UPSTREAM_SOCKS=host.docker.internal:<port>. On Linux this maps to the host.
     # extra_hosts:

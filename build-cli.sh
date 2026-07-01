@@ -17,6 +17,7 @@ vk:headless-vk-creator \
 telemost:headless-telemost-creator \
 wbstream:headless-wbstream-creator \
 dion:headless-dion-creator \
+creator-service:headless-creator-service \
 telemost-joiner:headless-telemost-joiner \
 wbstream-joiner:headless-wbstream-joiner \
 dion-joiner:headless-dion-joiner \
