@@ -8,6 +8,9 @@ export ANDROID_HOME
 export ANDROID_NDK_HOME
 export CGO_LDFLAGS="-Wl,-z,max-page-size=16384"
 export PATH="$PATH:/opt/homebrew/bin:$HOME/go/bin"
+if [ -z "${GOMOBILE_LDFLAGS:-}" ]; then
+    GOMOBILE_LDFLAGS="-s -w -checklinkname=0"
+fi
 
 # Check deps
 command -v go >/dev/null || { echo "go not found"; exit 1; }
@@ -19,7 +22,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT/relay"
 
 echo "Building gomobile .aar..."
-gomobile bind -v -trimpath -ldflags="-s -w" -target=android -androidapi 23 -o mobile.aar ./androidbind/ 2>&1
+gomobile bind -v -trimpath -ldflags="$GOMOBILE_LDFLAGS" -target=android -androidapi 23 -o mobile.aar ./androidbind/ 2>&1
 
 echo "Copying .aar to android-app/libs..."
 mkdir -p ../android-app/app/libs

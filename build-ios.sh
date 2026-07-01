@@ -2,6 +2,9 @@
 set -e
 
 export PATH="$PATH:/opt/homebrew/bin:$HOME/go/bin"
+if [ -z "${GOMOBILE_LDFLAGS:-}" ]; then
+    GOMOBILE_LDFLAGS="-s -w -checklinkname=0"
+fi
 
 command -v go >/dev/null || { echo "go not found"; exit 1; }
 command -v gomobile >/dev/null || { echo "gomobile not found, run: go install golang.org/x/mobile/cmd/gomobile@latest"; exit 1; }
@@ -16,7 +19,7 @@ IPA_PATH="$ROOT/prebuilts/whitelist-bypass-proxy.ipa"
 echo "Building gomobile .xcframework for iOS..."
 cd "$ROOT/relay"
 rm -rf "$ROOT/ios-proxy-app/Mobile.xcframework"
-gomobile bind -v -trimpath -ldflags="-s -w" -target=ios -o "$ROOT/ios-proxy-app/Mobile.xcframework" ./pion/ios/ 2>&1
+gomobile bind -v -trimpath -ldflags="$GOMOBILE_LDFLAGS" -target=ios -o "$ROOT/ios-proxy-app/Mobile.xcframework" ./pion/ios/ 2>&1
 
 echo "xcframework size:"
 du -sh "$ROOT/ios-proxy-app/Mobile.xcframework"
