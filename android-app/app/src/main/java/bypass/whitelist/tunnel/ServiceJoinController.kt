@@ -30,7 +30,7 @@ class ServiceJoinController(
         onStatus = ::handleServiceStatus,
         serviceControl = ServiceControlConfig(
             userId = userId,
-            cookieFile = cookieFile(context, userId, workPlatform).takeIf(File::isFile)?.absolutePath,
+            cookieFile = ServiceCookieStore.cookieFile(context, userId, workPlatform).takeIf(File::isFile)?.absolutePath,
             cookiePlatform = workPlatform,
             workPlatform = workPlatform,
             requestId = requestId,
@@ -90,8 +90,4 @@ class ServiceJoinController(
         workController = null
     }
 
-    companion object {
-        fun cookieFile(context: Context, userId: String, platform: CallPlatform): File =
-            File(File(File(context.filesDir, "service-cookies"), userId), "${platform.id}.json")
-    }
 }

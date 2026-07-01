@@ -94,6 +94,13 @@
     <string name="sheet_service_control">Use as service call</string>
     <string name="sheet_work_platform">Work call platform</string>
     <string name="sheet_service_wb_only">Service calls currently require a WB Stream link</string>
+    <string name="yandex_account_title">Yandex account</string>
+    <string name="yandex_account_ready">Session saved</string>
+    <string name="yandex_account_required">Sign-in required</string>
+    <string name="yandex_account_save">Save session</string>
+    <string name="yandex_account_forget">Forget session</string>
+    <string name="yandex_account_saved">Saved %1$d cookies</string>
+    <string name="yandex_account_not_signed_in">Sign in to Yandex first</string>
     <string name="sheet_save">Save call</string>
     <string name="sheet_save_short">Save</string>
     <string name="sheet_cancel">Cancel</string>

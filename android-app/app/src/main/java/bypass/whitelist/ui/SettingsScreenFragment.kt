@@ -11,6 +11,8 @@ import androidx.fragment.app.Fragment
 import bypass.whitelist.App
 import bypass.whitelist.R
 import bypass.whitelist.tunnel.SplitTunnelingMode
+import bypass.whitelist.tunnel.CallPlatform
+import bypass.whitelist.tunnel.ServiceCookieStore
 import bypass.whitelist.tunnel.TunnelMode
 import bypass.whitelist.util.Callback
 import bypass.whitelist.util.ParamCallback
@@ -101,6 +103,15 @@ class SettingsScreenFragment : Fragment(R.layout.fragment_settings_screen) {
 
         addRow(card, R.drawable.ic_setting_autofill, getString(R.string.settings_row_autofill), if (Prefs.autofillEnabled) Prefs.autofillName else getString(R.string.settings_row_autofill_off), null) {
             AutofillActionSheet.show(parentFragmentManager) { rebuild() }
+        }
+
+        val accountStatus = if (ServiceCookieStore.hasCookies(requireContext(), Prefs.serviceUserId, CallPlatform.TELEMOST)) {
+            getString(R.string.yandex_account_ready)
+        } else {
+            getString(R.string.yandex_account_required)
+        }
+        addRow(card, R.drawable.ic_setting_autofill, getString(R.string.yandex_account_title), accountStatus, null) {
+            (activity as? MainActivityHost)?.pushSubPage(YandexAccountFragment())
         }
 
         return section
