@@ -127,6 +127,14 @@ object Prefs {
         get() = prefs.getString(PrefsKeys.ACTIVE_DESTINATION_ID, "") ?: ""
         set(value) = prefs.edit { putString(PrefsKeys.ACTIVE_DESTINATION_ID, value) }
 
+    var discoveredEgressList: String
+        get() = prefs.getString(PrefsKeys.DISCOVERED_EGRESS_LIST, "{\"egresses\":[]}") ?: "{\"egresses\":[]}"
+        set(value) = prefs.edit { putString(PrefsKeys.DISCOVERED_EGRESS_LIST, value) }
+
+    var discoveredEgressProbes: String
+        get() = prefs.getString(PrefsKeys.DISCOVERED_EGRESS_PROBES, "{}") ?: "{}"
+        set(value) = prefs.edit { putString(PrefsKeys.DISCOVERED_EGRESS_PROBES, value) }
+
     var themeMode: ThemeMode
         get() {
             val name = prefs.getString(PrefsKeys.THEME_MODE, ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name

@@ -134,11 +134,12 @@
             android:textColor="@color/ink_3"
             android:textSize="10sp" />
 
-        <EditText
+        <AutoCompleteTextView
             android:id="@+id/inputEgressId"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_input"
+            android:completionThreshold="0"
             android:fontFamily="monospace"
             android:hint="@string/sheet_field_egress_hint"
             android:inputType="text"
@@ -146,6 +147,14 @@
             android:textColor="@color/ink"
             android:textColorHint="@color/ink_3"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/egressDiscoveryStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="5dp"
+            android:textColor="@color/ink_3"
+            android:textSize="11sp" />
 
         <LinearLayout
             android:layout_width="match_parent"

@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,8 +15,9 @@ import (
 )
 
 const (
-	TypeDirect = "direct"
-	TypeSOCKS5 = "socks5"
+	TypeDirect          = "direct"
+	TypeSOCKS5          = "socks5"
+	DefaultProbeAddress = "1.1.1.1:443"
 )
 
 var idPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`)
@@ -36,27 +38,34 @@ type Dialer interface {
 type Config struct {
 	SchemaVersion int       `json:"schemaVersion"`
 	DefaultEgress string    `json:"defaultEgress"`
+	ProbeAddress  string    `json:"probeAddress,omitempty"`
 	Egresses      []Profile `json:"egresses"`
 }
 
+type Descriptor struct {
+	ID        string `json:"id"`
+	IsDefault bool   `json:"isDefault"`
+}
+
 type Profile struct {
-	ID          string `json:"id"`
-	Type        string `json:"type"`
-	Address     string `json:"address,omitempty"`
-	Username    string `json:"username,omitempty"`
-	Password    string `json:"password,omitempty"`
-	PasswordEnv string `json:"passwordEnv,omitempty"`
+	ID           string `json:"id"`
+	Type         string `json:"type"`
+	Address      string `json:"address,omitempty"`
+	Username     string `json:"username,omitempty"`
+	Password     string `json:"password,omitempty"`
+	PasswordEnv  string `json:"passwordEnv,omitempty"`
 	PasswordFile string `json:"passwordFile,omitempty"`
-	Enabled     bool   `json:"enabled"`
+	Enabled      bool   `json:"enabled"`
 }
 
 type Registry struct {
-	defaultID string
-	dialers   map[string]Dialer
+	defaultID    string
+	probeAddress string
+	dialers      map[string]Dialer
 }
 
 func NewRegistry(defaultID string, dialers ...Dialer) (*Registry, error) {
-	out := &Registry{defaultID: strings.TrimSpace(defaultID), dialers: make(map[string]Dialer)}
+	out := &Registry{defaultID: strings.TrimSpace(defaultID), probeAddress: DefaultProbeAddress, dialers: make(map[string]Dialer)}
 	for _, dialer := range dialers {
 		if dialer == nil {
 			continue
@@ -124,7 +133,51 @@ func RegistryFromConfig(cfg Config) (*Registry, error) {
 	if len(dialers) == 0 {
 		return nil, errors.New("egress: no enabled profiles")
 	}
-	return NewRegistry(cfg.DefaultEgress, dialers...)
+	registry, err := NewRegistry(cfg.DefaultEgress, dialers...)
+	if err != nil {
+		return nil, err
+	}
+	if probeAddress := strings.TrimSpace(cfg.ProbeAddress); probeAddress != "" {
+		if _, _, err := net.SplitHostPort(probeAddress); err != nil {
+			return nil, fmt.Errorf("egress: probeAddress: %w", err)
+		}
+		registry.probeAddress = probeAddress
+	}
+	return registry, nil
+}
+
+func (r *Registry) Descriptors() []Descriptor {
+	if r == nil {
+		r = DirectRegistry()
+	}
+	ids := make([]string, 0, len(r.dialers))
+	for id := range r.dialers {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	out := make([]Descriptor, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, Descriptor{ID: id, IsDefault: id == r.defaultID})
+	}
+	return out
+}
+
+func (r *Registry) Probe(id string, timeout time.Duration) (time.Duration, error) {
+	if r == nil {
+		r = DirectRegistry()
+	}
+	started := time.Now()
+	dialer, _, err := r.Select(id)
+	if err != nil {
+		return time.Since(started), err
+	}
+	conn, err := dialer.DialTCP(r.probeAddress, timeout)
+	duration := time.Since(started)
+	if err != nil {
+		return duration, err
+	}
+	conn.Close()
+	return duration, nil
 }
 
 func (r *Registry) Select(requestedID string) (Dialer, string, error) {

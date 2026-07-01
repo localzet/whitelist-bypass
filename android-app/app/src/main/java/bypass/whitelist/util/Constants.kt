@@ -69,6 +69,8 @@ object PrefsKeys {
     const val SAVED_DESTINATIONS = "saved_destinations"
     const val ACTIVE_DESTINATION_ID = "active_destination_id"
     const val THEME_MODE = "theme_mode"
+    const val DISCOVERED_EGRESS_LIST = "discovered_egress_list"
+    const val DISCOVERED_EGRESS_PROBES = "discovered_egress_probes"
 }
 
 object VP8Defaults {

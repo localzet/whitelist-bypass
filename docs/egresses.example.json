@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "defaultEgress": "direct",
+  "probeAddress": "1.1.1.1:443",
   "egresses": [
     {
       "id": "direct",

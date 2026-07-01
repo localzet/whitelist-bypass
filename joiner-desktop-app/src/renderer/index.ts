@@ -25,7 +25,12 @@ interface Bridge {
   onLog(cb: (text: string) => void): void;
   onStatus(cb: (status: string) => void): void;
   onRunning(cb: (running: boolean) => void): void;
+  onEgressList(cb: (egresses: EgressDescriptor[]) => void): void;
+  onEgressProbe(cb: (result: EgressProbeResult) => void): void;
 }
+
+interface EgressDescriptor { id: string; isDefault: boolean }
+interface EgressProbeResult { id: string; available: boolean; latencyMs: number; error?: string }
 declare const bridge: Bridge;
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -38,6 +43,10 @@ const startBtn = $('start') as HTMLButtonElement;
 const stopBtn = $('stop') as HTMLButtonElement;
 const downloadLogsBtn = $('downloadLogs') as HTMLImageElement;
 const platformHint = $('platformHint');
+const egressStatus = $('egressStatus');
+const egressOptions = $('egressOptions') as HTMLDataListElement;
+let discoveredEgresses: EgressDescriptor[] = [];
+const egressProbes = new Map<string, EgressProbeResult>();
 const linkInput = input('link');
 const savedSettingsRaw = localStorage.getItem('joiner:lastSettings');
 
@@ -95,6 +104,35 @@ bridge.onRunning((running) => {
   startBtn.disabled = running;
   stopBtn.disabled = !running;
 });
+bridge.onEgressList((egresses) => {
+  discoveredEgresses = egresses;
+  egressProbes.clear();
+  renderEgresses();
+});
+bridge.onEgressProbe((result) => {
+  egressProbes.set(result.id, result);
+  renderEgresses();
+});
+
+function renderEgresses() {
+  egressOptions.replaceChildren(...discoveredEgresses.map((egress) => {
+    const option = document.createElement('option');
+    option.value = egress.id;
+    const probe = egressProbes.get(egress.id);
+    const state = probe ? (probe.available ? `${probe.latencyMs} ms` : 'unavailable') : 'probing...';
+    option.label = `${egress.id}${egress.isDefault ? ' (default)' : ''} — ${state}`;
+    return option;
+  }));
+  if (discoveredEgresses.length === 0) {
+    egressStatus.textContent = 'Available profiles will be loaded after connection';
+    return;
+  }
+  egressStatus.textContent = discoveredEgresses.map((egress) => {
+    const probe = egressProbes.get(egress.id);
+    const state = probe ? (probe.available ? `${probe.latencyMs} ms` : 'offline') : '...';
+    return `${egress.id}${egress.isDefault ? '*' : ''}: ${state}`;
+  }).join(' · ');
+}
 
 startBtn.addEventListener('click', async () => {
   appendLog('\n[ui] starting joiner...\n');

@@ -7,6 +7,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -15,6 +17,7 @@ import androidx.fragment.app.FragmentManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import bypass.whitelist.R
 import bypass.whitelist.tunnel.CallConfig
+import bypass.whitelist.tunnel.EgressDiscovery
 import bypass.whitelist.util.Prefs
 
 class AddDestinationSheet : BottomSheetDialogFragment() {
@@ -28,11 +31,16 @@ class AddDestinationSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val inputName = view.findViewById<EditText>(R.id.inputName)
         val inputLink = view.findViewById<EditText>(R.id.inputLink)
-        val inputEgressId = view.findViewById<EditText>(R.id.inputEgressId)
+        val inputEgressId = view.findViewById<AutoCompleteTextView>(R.id.inputEgressId)
+        val egressDiscoveryStatus = view.findViewById<TextView>(R.id.egressDiscoveryStatus)
         val pasteChip = view.findViewById<LinearLayout>(R.id.pasteChip)
         val pasteChipLabel = view.findViewById<TextView>(R.id.pasteChipLabel)
         val buttonCancel = view.findViewById<Button>(R.id.buttonCancel)
         val buttonSave = view.findViewById<Button>(R.id.buttonSave)
+
+        inputEgressId.setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, EgressDiscovery.ids()))
+        inputEgressId.setOnClickListener { inputEgressId.showDropDown() }
+        egressDiscoveryStatus.text = EgressDiscovery.summary()
 
         pasteChip.setOnClickListener {
             val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

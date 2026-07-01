@@ -112,6 +112,7 @@ class HeadlessRelayController(
                         }
                     } else {
                         Log.d("RELAY", line)
+                        EgressDiscovery.consume(line)
                         onLog.invoke(line)
                     }
                 }

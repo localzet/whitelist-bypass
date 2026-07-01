@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { spawn, ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { IPC, JoinerSettings } from '../constants';
+import { IPC, JoinerSettings, EgressDescriptor, EgressProbeResult } from '../constants';
 
 // Single global joiner process. We never run two tunnels at once: the
 // wintun adapter and the route table are exclusive resources.
@@ -145,22 +145,50 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
     send(IPC.RUNNING, false);
     joinerProcess = null;
   });
-  const handleOutput = (text: string) => {
-    send(IPC.LOG, text);
-    if (text.includes('TUNNEL ACTIVE')) send(IPC.STATUS, 'active');
-    if (text.includes('TUNNEL CONNECTED')) {
-      send(IPC.STATUS, 'connected');
-      retryCount = 0;
-    }
-    const captchaMatch = text.match(/STATUS:CAPTCHA:(\S+)/);
-    if (captchaMatch) {
-      openCaptchaWindow(captchaMatch[1]);
-    } else if (captchaWindow && /captcha solved|Auth complete|TUNNEL/i.test(text)) {
-      closeCaptchaWindow();
+  const parseDiscoveryLine = (line: string) => {
+    const listMarker = 'EGRESS_LIST:';
+    const probeMarker = 'EGRESS_PROBE:';
+    try {
+      const listAt = line.indexOf(listMarker);
+      if (listAt >= 0) {
+        const payload = JSON.parse(line.slice(listAt + listMarker.length)) as { egresses: EgressDescriptor[] };
+        send(IPC.EGRESS_LIST, payload.egresses);
+      }
+      const probeAt = line.indexOf(probeMarker);
+      if (probeAt >= 0) {
+        send(IPC.EGRESS_PROBE, JSON.parse(line.slice(probeAt + probeMarker.length)) as EgressProbeResult);
+      }
+    } catch (err) {
+      send(IPC.LOG, `[main] invalid egress discovery payload: ${(err as Error).message}\n`);
     }
   };
-  joinerProcess.stdout?.on('data', (b: Buffer) => handleOutput(b.toString()));
-  joinerProcess.stderr?.on('data', (b: Buffer) => handleOutput(b.toString()));
+  const makeOutputHandler = () => {
+    let pending = '';
+    return (text: string) => {
+      send(IPC.LOG, text);
+      pending += text;
+      const lines = pending.split(/\r?\n/);
+      pending = lines.pop() ?? '';
+      for (const line of lines) {
+        parseDiscoveryLine(line);
+      }
+      if (text.includes('TUNNEL ACTIVE')) send(IPC.STATUS, 'active');
+      if (text.includes('TUNNEL CONNECTED')) {
+        send(IPC.STATUS, 'connected');
+        retryCount = 0;
+      }
+      const captchaMatch = text.match(/STATUS:CAPTCHA:(\S+)/);
+      if (captchaMatch) {
+        openCaptchaWindow(captchaMatch[1]);
+      } else if (captchaWindow && /captcha solved|Auth complete|TUNNEL/i.test(text)) {
+        closeCaptchaWindow();
+      }
+    };
+  };
+  const handleStdout = makeOutputHandler();
+  const handleStderr = makeOutputHandler();
+  joinerProcess.stdout?.on('data', (b: Buffer) => handleStdout(b.toString()));
+  joinerProcess.stderr?.on('data', (b: Buffer) => handleStderr(b.toString()));
   joinerProcess.on('exit', (code, signal) => {
     closeCaptchaWindow();
     send(IPC.LOG, `\n[main] joiner exited code=${code} signal=${signal}\n`);

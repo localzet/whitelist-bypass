@@ -64,6 +64,7 @@ class RelayController(
 
     private fun startDc() {
         val cb = LogCallback { msg ->
+            EgressDiscovery.consume(msg)
             onLog(msg)
             if (msg.contains("browser connected")) onStatus(VpnStatus.TUNNEL_ACTIVE)
             else if (msg.contains("ws read error")) onStatus(VpnStatus.TUNNEL_LOST)
@@ -76,7 +77,7 @@ class RelayController(
                 return@Thread
             }
             try {
-                Androidbind.startJoiner(Ports.DC_WS, Prefs.socksPort, Prefs.socksHost, SocksAuth.user, SocksAuth.pass, cb)
+                Androidbind.startJoiner(Ports.DC_WS, Prefs.socksPort, Prefs.socksHost, SocksAuth.user, SocksAuth.pass, Prefs.activeEgressId, cb)
             } catch (e: Exception) {
                 if (isRunning) onLog("Relay error: ${e.message}")
             }
@@ -106,7 +107,8 @@ class RelayController(
                     "--socks-host", Prefs.socksHost,
                     "--socks-port", "${Prefs.socksPort}",
                     "--socks-user", SocksAuth.user,
-                    "--socks-pass", SocksAuth.pass
+                    "--socks-pass", SocksAuth.pass,
+                    "--egress-id", Prefs.activeEgressId
                 )
                 pb.redirectErrorStream(true)
                 val proc = pb.start()
@@ -132,6 +134,7 @@ class RelayController(
                         }
                     } else {
                         Log.d("RELAY", line)
+                        EgressDiscovery.consume(line)
                         onLog(line)
                         if (line.contains("CONNECTED")) onStatus(VpnStatus.TUNNEL_ACTIVE)
                         else if (line.contains("session cleaned up")) onStatus(VpnStatus.TUNNEL_LOST)

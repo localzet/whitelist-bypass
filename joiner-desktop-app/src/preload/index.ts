@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, JoinerSettings } from '../constants';
+import { IPC, JoinerSettings, EgressDescriptor, EgressProbeResult } from '../constants';
 
 contextBridge.exposeInMainWorld('bridge', {
   start: (settings: JoinerSettings) => ipcRenderer.invoke(IPC.START, settings),
@@ -12,5 +12,11 @@ contextBridge.exposeInMainWorld('bridge', {
   },
   onRunning(cb: (running: boolean) => void) {
     ipcRenderer.on(IPC.RUNNING, (_e, v) => cb(v));
+  },
+  onEgressList(cb: (egresses: EgressDescriptor[]) => void) {
+    ipcRenderer.on(IPC.EGRESS_LIST, (_e, egresses) => cb(egresses));
+  },
+  onEgressProbe(cb: (result: EgressProbeResult) => void) {
+    ipcRenderer.on(IPC.EGRESS_PROBE, (_e, result) => cb(result));
   },
 });

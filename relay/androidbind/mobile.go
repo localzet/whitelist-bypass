@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	_ "golang.org/x/mobile/bind"
 	"whitelist-bypass/relay/common"
+	"whitelist-bypass/relay/tunnel"
 )
 
 const (
@@ -25,7 +26,6 @@ const (
 )
 
 const readBufSize = 65536
-
 
 var framePool = sync.Pool{
 	New: func() any {
@@ -72,7 +72,6 @@ func logMsg(format string, args ...any) {
 	}
 }
 
-
 type wsWriter struct {
 	ws   *websocket.Conn
 	ch   chan []byte
@@ -113,7 +112,6 @@ func (w *wsWriter) close() {
 	<-w.done
 }
 
-
 var activeJoiner struct {
 	sync.Mutex
 	j         *joinerRelay
@@ -144,7 +142,7 @@ func StopJoiner() {
 	logMsg("dc-joiner: stopped")
 }
 
-func StartJoiner(wsPort, socksPort int, socksHost, socksUser, socksPass string, cb LogCallback) error {
+func StartJoiner(wsPort, socksPort int, socksHost, socksUser, socksPass, egressID string, cb LogCallback) error {
 	StopJoiner()
 	logCb = cb
 	j := &joinerRelay{
@@ -152,6 +150,7 @@ func StartJoiner(wsPort, socksPort int, socksHost, socksUser, socksPass string, 
 		ready:     make(chan struct{}),
 		socksUser: socksUser,
 		socksPass: socksPass,
+		egressID: egressID,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", j.handleWS)
@@ -200,6 +199,7 @@ type joinerRelay struct {
 	once       sync.Once
 	socksUser  string
 	socksPass  string
+	egressID   string
 }
 
 func (j *joinerRelay) closeAll() {
@@ -318,6 +318,7 @@ func (j *joinerRelay) handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	j.writer = newWSWriter(ws)
 	j.once.Do(func() { close(j.ready) })
+	j.send(tunnel.ControlConnID, tunnel.MsgClientHello, tunnel.EncodeClientHelloPayload(j.egressID))
 	logMsg("dc-joiner: browser connected via WebSocket")
 	for {
 		_, msg, err := ws.ReadMessage()
@@ -331,6 +332,31 @@ func (j *joinerRelay) handleWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (j *joinerRelay) handleMessage(connID uint32, msgType byte, payload []byte) {
+	if connID == tunnel.ControlConnID {
+		switch msgType {
+		case tunnel.MsgServerHello:
+			if hello, ok := tunnel.DecodeServerHello(payload); ok {
+				logMsg("dc-joiner: server selected egress %q", hello.SelectedEgressID)
+				j.send(tunnel.ControlConnID, tunnel.MsgEgressListRequest, nil)
+			}
+		case tunnel.MsgEgressList:
+			if list, ok := tunnel.DecodeEgressList(payload); ok {
+				logMsg("EGRESS_LIST:%s", payload)
+				for _, descriptor := range list.Egresses {
+					j.send(tunnel.ControlConnID, tunnel.MsgEgressProbeRequest, tunnel.EncodeEgressProbeRequestPayload(descriptor.ID))
+				}
+			}
+		case tunnel.MsgEgressProbeResult:
+			if _, ok := tunnel.DecodeEgressProbeResult(payload); ok {
+				logMsg("EGRESS_PROBE:%s", payload)
+			}
+		case tunnel.MsgControlErr:
+			if controlErr, ok := tunnel.DecodeControlError(payload); ok {
+				logMsg("dc-joiner: creator rejected control request: %s", controlErr.SafeMessage)
+			}
+		}
+		return
+	}
 	val, ok := j.conns.Load(connID)
 	if !ok {
 		return
@@ -471,4 +497,3 @@ func (j *joinerRelay) handleSOCKS(conn net.Conn) {
 		}
 	}()
 }
-

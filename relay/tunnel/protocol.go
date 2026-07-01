@@ -6,18 +6,22 @@ import (
 )
 
 const (
-	MsgConnect    byte = 0x01
-	MsgConnectOK  byte = 0x02
-	MsgConnectErr byte = 0x03
-	MsgData       byte = 0x04
-	MsgClose      byte = 0x05
-	MsgUDP        byte = 0x06
-	MsgUDPReply   byte = 0x07
-	MsgConfig     byte = 0x08
-	MsgConfigAck  byte = 0x09
-	MsgClientHello byte = 0x0A
-	MsgServerHello byte = 0x0B
-	MsgControlErr  byte = 0x0C
+	MsgConnect            byte = 0x01
+	MsgConnectOK          byte = 0x02
+	MsgConnectErr         byte = 0x03
+	MsgData               byte = 0x04
+	MsgClose              byte = 0x05
+	MsgUDP                byte = 0x06
+	MsgUDPReply           byte = 0x07
+	MsgConfig             byte = 0x08
+	MsgConfigAck          byte = 0x09
+	MsgClientHello        byte = 0x0A
+	MsgServerHello        byte = 0x0B
+	MsgControlErr         byte = 0x0C
+	MsgEgressListRequest  byte = 0x0D
+	MsgEgressList         byte = 0x0E
+	MsgEgressProbeRequest byte = 0x0F
+	MsgEgressProbeResult  byte = 0x10
 )
 
 const ControlConnID uint32 = 0
@@ -48,6 +52,26 @@ type ControlError struct {
 	SafeMessage string `json:"safeMessage"`
 }
 
+type EgressDescriptor struct {
+	ID        string `json:"id"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+type EgressList struct {
+	Egresses []EgressDescriptor `json:"egresses"`
+}
+
+type EgressProbeRequest struct {
+	ID string `json:"id"`
+}
+
+type EgressProbeResult struct {
+	ID        string `json:"id"`
+	Available bool   `json:"available"`
+	LatencyMS int64  `json:"latencyMs"`
+	Error     string `json:"error,omitempty"`
+}
+
 func EncodeClientHello(requestedEgressID string) []byte {
 	return EncodeFrame(ControlConnID, MsgClientHello, EncodeClientHelloPayload(requestedEgressID))
 }
@@ -55,7 +79,7 @@ func EncodeClientHello(requestedEgressID string) []byte {
 func EncodeClientHelloPayload(requestedEgressID string) []byte {
 	return encodeControlJSON(ClientHello{
 		ProtocolVersion:  ControlProtocolVersion,
-		Capabilities:     []string{"egress-select"},
+		Capabilities:     []string{"egress-select", "egress-discovery", "egress-probe"},
 		RequestedEgressID: requestedEgressID,
 	})
 }
@@ -67,7 +91,7 @@ func EncodeServerHello(selectedEgressID string) []byte {
 func EncodeServerHelloPayload(selectedEgressID string) []byte {
 	return encodeControlJSON(ServerHello{
 		ProtocolVersion: ControlProtocolVersion,
-		Capabilities:    []string{"egress-select"},
+		Capabilities:    []string{"egress-select", "egress-discovery", "egress-probe"},
 		SelectedEgressID: selectedEgressID,
 	})
 }
@@ -113,10 +137,54 @@ func DecodeControlError(payload []byte) (ControlError, bool) {
 	return msg, msg.Code != ""
 }
 
+func EncodeEgressListPayload(egresses []EgressDescriptor) []byte {
+	return encodeControlJSON(EgressList{Egresses: egresses})
+}
+
+func DecodeEgressList(payload []byte) (EgressList, bool) {
+	var msg EgressList
+	if !decodeControlJSON(payload, &msg) {
+		return msg, false
+	}
+	return msg, len(msg.Egresses) <= 64
+}
+
+func EncodeEgressProbeRequestPayload(id string) []byte {
+	return encodeControlJSON(EgressProbeRequest{ID: id})
+}
+
+func DecodeEgressProbeRequest(payload []byte) (EgressProbeRequest, bool) {
+	var msg EgressProbeRequest
+	if !decodeControlJSON(payload, &msg) {
+		return msg, false
+	}
+	return msg, msg.ID != ""
+}
+
+func EncodeEgressProbeResultPayload(result EgressProbeResult) []byte {
+	return encodeControlJSON(result)
+}
+
+func DecodeEgressProbeResult(payload []byte) (EgressProbeResult, bool) {
+	var msg EgressProbeResult
+	if !decodeControlJSON(payload, &msg) {
+		return msg, false
+	}
+	return msg, msg.ID != "" && msg.LatencyMS >= 0
+}
+
+func decodeControlJSON(payload []byte, value any) bool {
+	if len(payload) == 0 || len(payload) > MaxControlPayload {
+		return false
+	}
+	return json.Unmarshal(payload, value) == nil
+}
+
 func encodeControlJSON(value any) []byte {
 	payload, _ := json.Marshal(value)
 	return payload
 }
+
 func EncodeVP8Config(fps, batch, trackCount int) []byte {
 	if fps < 1 {
 		fps = 1

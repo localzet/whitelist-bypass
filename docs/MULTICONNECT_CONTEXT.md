@@ -1,8 +1,10 @@
 # Multiconnect: архитектура и контекст разработки
 
-Актуально на 2026-07-01 для `main` / `6571875` (`add arm32 and mips architectures into cli script`).
+Актуально на 2026-07-01 для ветки `main`; последняя итерация добавляет автоматический egress discovery и раздельные probes.
 
-Дополнение после итерации `feat: add multiconnect egress selection`: начата реализация multiconnect в коде. Добавлены `relay/egress`, versioned control handshake, `--egress-config` на creator и `--egress-id` на joiner. Android получил `egressId` в сохранённых звонках и UI редактирования. Windows/Linux desktop joiner получил поле `Egress ID` и восстановление последней формы. Пример серверного конфига лежит в `docs/egresses.example.json`.
+Дополнение после итераций multiconnect: добавлены `relay/egress`, versioned control handshake, `--egress-config` на creator и `--egress-id` на joiner. Joiner после handshake автоматически получает безопасный список профилей и отдельный health/latency probe каждого маршрута. Android и Windows/Linux desktop сохраняют discovery и предлагают доступные ID. Пример серверного конфига лежит в `docs/egresses.example.json`.
+
+Следующая архитектурная итерация — разделить control plane и data plane. У каждого пользователя остаётся стабильный служебный звонок. Через него joiner получает discovery и отправляет `CreateSession(egressId)`. Creator создаёт или переиспользует отдельный рабочий звонок, привязанный к `(userId, egressId)`, и отвечает `sessionId`, ссылкой и TTL. Joiner штатно завершает служебный transport и подключается к рабочему звонку. Нельзя переключать egress глобально внутри общего звонка: это меняет маршрут всех пользователей и смешивает существующие TCP/UDP-сессии. Нужны per-user sessions, лимиты, идемпотентный request ID, TTL/cleanup и авторизация управляющих запросов.
 
 ## 1. Цель
 

@@ -111,7 +111,7 @@ func main() {
 
 	switch *mode {
 	case "dc-joiner":
-		log.Fatal(androidbind.StartJoiner(*wsPort, *socksPort, *socksHost, *socksUser, *socksPass, cb))
+		log.Fatal(androidbind.StartJoiner(*wsPort, *socksPort, *socksHost, *socksUser, *socksPass, *egressID, cb))
 	case "dc-creator":
 		log.Fatal(startDCCreator(*wsPort, egressRegistry))
 	case "vk-video-joiner":

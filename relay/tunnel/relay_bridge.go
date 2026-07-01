@@ -262,6 +262,12 @@ func (rb *RelayBridge) requestedEgress() string {
 	return rb.requestedEgressID
 }
 
+func (rb *RelayBridge) currentEgressRegistry() *egress.Registry {
+	rb.egressMu.RLock()
+	defer rb.egressMu.RUnlock()
+	return rb.egressReg
+}
+
 func (rb *RelayBridge) selectedDialer() (egress.Dialer, string, error) {
 	rb.egressMu.RLock()
 	dialer := rb.dialer
@@ -383,6 +389,7 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 				rb.egressMu.Unlock()
 				rb.logFn("relay: server selected egress %q", hello.SelectedEgressID)
 				rb.markHandshakeDone()
+				rb.send(ControlConnID, MsgEgressListRequest, nil)
 			}
 			return
 		}
@@ -395,6 +402,49 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 				}
 				rb.setHandshakeError(fmt.Errorf("%s: %s", ctrlErr.Code, ctrlErr.SafeMessage))
 				rb.logFn("relay: control error %s: %s", ctrlErr.Code, ctrlErr.SafeMessage)
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgEgressListRequest {
+			if rb.mode == "creator" {
+				descriptors := rb.currentEgressRegistry().Descriptors()
+				items := make([]EgressDescriptor, 0, len(descriptors))
+				for _, descriptor := range descriptors {
+					items = append(items, EgressDescriptor{ID: descriptor.ID, IsDefault: descriptor.IsDefault})
+				}
+				rb.send(ControlConnID, MsgEgressList, EncodeEgressListPayload(items))
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgEgressList {
+			if rb.mode == "joiner" {
+				list, ok := DecodeEgressList(payload)
+				if !ok {
+					rb.logFn("relay: invalid egress discovery response")
+					return
+				}
+				rb.logFn("EGRESS_LIST:%s", payload)
+				for _, descriptor := range list.Egresses {
+					rb.send(ControlConnID, MsgEgressProbeRequest, EncodeEgressProbeRequestPayload(descriptor.ID))
+				}
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgEgressProbeRequest {
+			if rb.mode == "creator" {
+				request, ok := DecodeEgressProbeRequest(payload)
+				if !ok {
+					return
+				}
+				go rb.probeEgress(request.ID)
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgEgressProbeResult {
+			if rb.mode == "joiner" {
+				if _, ok := DecodeEgressProbeResult(payload); ok {
+					rb.logFn("EGRESS_PROBE:%s", payload)
+				}
 			}
 			return
 		}
@@ -591,6 +641,19 @@ func (rb *RelayBridge) dialCreatorUDP(addr string) (*creatorUDP, error) {
 		return nil, err
 	}
 	return &creatorUDP{session: sess}, nil
+}
+
+func (rb *RelayBridge) probeEgress(id string) {
+	duration, err := rb.currentEgressRegistry().Probe(id, 5*time.Second)
+	result := EgressProbeResult{
+		ID:        id,
+		Available: err == nil,
+		LatencyMS: duration.Milliseconds(),
+	}
+	if err != nil {
+		result.Error = common.MaskError(err)
+	}
+	rb.send(ControlConnID, MsgEgressProbeResult, EncodeEgressProbeResultPayload(result))
 }
 
 func (rb *RelayBridge) connectTCP(connID uint32, addr string) {

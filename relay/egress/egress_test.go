@@ -63,3 +63,26 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatalf("Select(default) = id %q err %v", id, err)
 	}
 }
+
+func TestRegistryDescriptorsAreSortedAndMarkDefault(t *testing.T) {
+	registry, err := NewRegistry("fi", DirectDialer{ProfileID: "fi"}, DirectDialer{ProfileID: "ee"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptors := registry.Descriptors()
+	if len(descriptors) != 2 || descriptors[0].ID != "ee" || descriptors[0].IsDefault || descriptors[1].ID != "fi" || !descriptors[1].IsDefault {
+		t.Fatalf("Descriptors() = %+v", descriptors)
+	}
+}
+
+func TestRegistryRejectsInvalidProbeAddress(t *testing.T) {
+	_, err := RegistryFromConfig(Config{
+		SchemaVersion: 1,
+		DefaultEgress: "direct",
+		ProbeAddress:  "missing-port",
+		Egresses:      []Profile{{ID: "direct", Type: TypeDirect, Enabled: true}},
+	})
+	if err == nil {
+		t.Fatal("RegistryFromConfig() expected invalid probeAddress error")
+	}
+}

@@ -17,16 +17,20 @@ import (
 )
 
 const (
-	dcMsgConnect     byte = 0x01
-	dcMsgConnectOK   byte = 0x02
-	dcMsgConnectErr  byte = 0x03
-	dcMsgData        byte = 0x04
-	dcMsgClose       byte = 0x05
-	dcMsgUDP         byte = 0x06
-	dcMsgUDPReply    byte = 0x07
-	dcMsgClientHello byte = 0x0A
-	dcMsgServerHello byte = 0x0B
-	dcMsgControlErr  byte = 0x0C
+	dcMsgConnect            byte = 0x01
+	dcMsgConnectOK          byte = 0x02
+	dcMsgConnectErr         byte = 0x03
+	dcMsgData               byte = 0x04
+	dcMsgClose              byte = 0x05
+	dcMsgUDP                byte = 0x06
+	dcMsgUDPReply           byte = 0x07
+	dcMsgClientHello        byte = 0x0A
+	dcMsgServerHello        byte = 0x0B
+	dcMsgControlErr         byte = 0x0C
+	dcMsgEgressListRequest  byte = 0x0D
+	dcMsgEgressList         byte = 0x0E
+	dcMsgEgressProbeRequest byte = 0x0F
+	dcMsgEgressProbeResult  byte = 0x10
 )
 
 const dcReadBufSize = 65536
@@ -150,6 +154,13 @@ func (c *dcCreatorRelay) handleMessage(connID uint32, msgType byte, payload []by
 	switch msgType {
 	case dcMsgClientHello:
 		c.selectEgress(payload)
+	case dcMsgEgressListRequest:
+		c.sendEgressList()
+	case dcMsgEgressProbeRequest:
+		request, ok := tunnel.DecodeEgressProbeRequest(payload)
+		if ok {
+			go c.probeEgress(request.ID)
+		}
 	case dcMsgConnect:
 		go c.connect(connID, string(payload))
 	case dcMsgUDP:
@@ -167,6 +178,24 @@ func (c *dcCreatorRelay) handleMessage(connID uint32, msgType byte, payload []by
 			}
 		}
 	}
+}
+
+func (c *dcCreatorRelay) sendEgressList() {
+	descriptors := c.registry.Descriptors()
+	items := make([]tunnel.EgressDescriptor, 0, len(descriptors))
+	for _, descriptor := range descriptors {
+		items = append(items, tunnel.EgressDescriptor{ID: descriptor.ID, IsDefault: descriptor.IsDefault})
+	}
+	c.send(tunnel.ControlConnID, dcMsgEgressList, tunnel.EncodeEgressListPayload(items))
+}
+
+func (c *dcCreatorRelay) probeEgress(id string) {
+	duration, err := c.registry.Probe(id, 5*time.Second)
+	result := tunnel.EgressProbeResult{ID: id, Available: err == nil, LatencyMS: duration.Milliseconds()}
+	if err != nil {
+		result.Error = common.MaskError(err)
+	}
+	c.send(tunnel.ControlConnID, dcMsgEgressProbeResult, tunnel.EncodeEgressProbeResultPayload(result))
 }
 
 func (c *dcCreatorRelay) selectEgress(payload []byte) {
