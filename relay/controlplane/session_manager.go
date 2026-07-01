@@ -153,6 +153,17 @@ func (m *Manager) Get(id string) (Session, bool) {
 	return session, ok
 }
 
+func (m *Manager) GetByRequest(userID, requestID string) (Session, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id := m.byRequest[requestKey(userID, requestID)]
+	if id == "" {
+		return Session{}, false
+	}
+	session, ok := m.sessions[id]
+	return session, ok
+}
+
 func (m *Manager) Count() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
