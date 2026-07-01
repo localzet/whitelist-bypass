@@ -12,16 +12,21 @@ import (
 
 	"github.com/gorilla/websocket"
 	"whitelist-bypass/relay/common"
+	"whitelist-bypass/relay/egress"
+	"whitelist-bypass/relay/tunnel"
 )
 
 const (
-	dcMsgConnect    byte = 0x01
-	dcMsgConnectOK  byte = 0x02
-	dcMsgConnectErr byte = 0x03
-	dcMsgData       byte = 0x04
-	dcMsgClose      byte = 0x05
-	dcMsgUDP        byte = 0x06
-	dcMsgUDPReply   byte = 0x07
+	dcMsgConnect     byte = 0x01
+	dcMsgConnectOK   byte = 0x02
+	dcMsgConnectErr  byte = 0x03
+	dcMsgData        byte = 0x04
+	dcMsgClose       byte = 0x05
+	dcMsgUDP         byte = 0x06
+	dcMsgUDPReply    byte = 0x07
+	dcMsgClientHello byte = 0x0A
+	dcMsgServerHello byte = 0x0B
+	dcMsgControlErr  byte = 0x0C
 )
 
 const dcReadBufSize = 65536
@@ -80,12 +85,20 @@ func (w *dcWSWriter) close() {
 }
 
 type dcCreatorRelay struct {
-	writer *dcWSWriter
-	conns  sync.Map
+	writer   *dcWSWriter
+	conns    sync.Map
+	registry *egress.Registry
+	egressMu sync.RWMutex
+	dialer   egress.Dialer
+	egressID string
 }
 
-func startDCCreator(wsPort int) error {
-	c := &dcCreatorRelay{conns: sync.Map{}}
+func startDCCreator(wsPort int, registry *egress.Registry) error {
+	c, err := newDCCreatorRelay(registry)
+	if err != nil {
+		return err
+	}
+	log.Printf("dc-creator: selected egress %q", c.egressID)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", c.handleWS)
 
@@ -96,6 +109,17 @@ func startDCCreator(wsPort int) error {
 	}
 	log.Printf("dc-creator: WebSocket on %s", wsAddr)
 	return http.Serve(ln, mux)
+}
+
+func newDCCreatorRelay(registry *egress.Registry) (*dcCreatorRelay, error) {
+	if registry == nil {
+		return nil, fmt.Errorf("dc-creator: egress registry is nil")
+	}
+	dialer, egressID, err := registry.Select("")
+	if err != nil {
+		return nil, fmt.Errorf("dc-creator: select default egress: %w", err)
+	}
+	return &dcCreatorRelay{registry: registry, dialer: dialer, egressID: egressID}, nil
 }
 
 func (c *dcCreatorRelay) handleWS(w http.ResponseWriter, r *http.Request) {
@@ -124,6 +148,8 @@ func (c *dcCreatorRelay) handleWS(w http.ResponseWriter, r *http.Request) {
 
 func (c *dcCreatorRelay) handleMessage(connID uint32, msgType byte, payload []byte) {
 	switch msgType {
+	case dcMsgClientHello:
+		c.selectEgress(payload)
 	case dcMsgConnect:
 		go c.connect(connID, string(payload))
 	case dcMsgUDP:
@@ -141,6 +167,32 @@ func (c *dcCreatorRelay) handleMessage(connID uint32, msgType byte, payload []by
 			}
 		}
 	}
+}
+
+func (c *dcCreatorRelay) selectEgress(payload []byte) {
+	hello, ok := tunnel.DecodeClientHello(payload)
+	if !ok {
+		c.send(tunnel.ControlConnID, dcMsgControlErr, tunnel.EncodeControlErrorPayload("bad_client_hello", "invalid egress handshake"))
+		return
+	}
+	dialer, id, err := c.registry.Select(hello.RequestedEgressID)
+	if err != nil {
+		log.Printf("dc-creator: egress selection failed: %v", err)
+		c.send(tunnel.ControlConnID, dcMsgControlErr, tunnel.EncodeControlErrorPayload("egress_unavailable", err.Error()))
+		return
+	}
+	c.egressMu.Lock()
+	c.dialer = dialer
+	c.egressID = id
+	c.egressMu.Unlock()
+	log.Printf("dc-creator: selected egress %q", id)
+	c.send(tunnel.ControlConnID, dcMsgServerHello, tunnel.EncodeServerHelloPayload(id))
+}
+
+func (c *dcCreatorRelay) selectedDialer() (egress.Dialer, string) {
+	c.egressMu.RLock()
+	defer c.egressMu.RUnlock()
+	return c.dialer, c.egressID
 }
 
 func (c *dcCreatorRelay) send(connID uint32, msgType byte, payload []byte) {
@@ -169,19 +221,18 @@ func (c *dcCreatorRelay) handleUDP(connID uint32, payload []byte) {
 	addr := string(payload[1 : 1+addrLen])
 	data := payload[1+addrLen:]
 
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+	dialer, egressID := c.selectedDialer()
+	conn, err := dialer.UDPAssociate(addr, 10*time.Second)
 	if err != nil {
-		log.Printf("dc-creator: UDP resolve %s failed: %s", common.MaskAddr(addr), common.MaskError(err))
-		return
-	}
-	conn, err := net.DialUDP("udp", nil, udpAddr)
-	if err != nil {
-		log.Printf("dc-creator: UDP dial %s failed: %s", common.MaskAddr(addr), common.MaskError(err))
+		log.Printf("dc-creator: UDP via %q to %s failed: %s", egressID, common.MaskAddr(addr), common.MaskError(err))
 		return
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(5 * time.Second))
-	conn.Write(data)
+	if err := conn.WriteTo(data, addr); err != nil {
+		log.Printf("dc-creator: UDP via %q to %s write failed: %s", egressID, common.MaskAddr(addr), common.MaskError(err))
+		return
+	}
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	buf := make([]byte, common.UDPBufSize)
 	n, err := conn.Read(buf)
 	if err != nil {
@@ -192,15 +243,16 @@ func (c *dcCreatorRelay) handleUDP(connID uint32, payload []byte) {
 
 func (c *dcCreatorRelay) connect(connID uint32, addr string) {
 	log.Printf("dc-creator: CONNECT %d -> %s", connID, common.MaskAddr(addr))
-	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	dialer, egressID := c.selectedDialer()
+	conn, err := dialer.DialTCP(addr, 10*time.Second)
 	if err != nil {
-		log.Printf("dc-creator: CONNECT %d failed: %s", connID, common.MaskError(err))
+		log.Printf("dc-creator: CONNECT %d via %q failed: %s", connID, egressID, common.MaskError(err))
 		c.send(connID, dcMsgConnectErr, []byte(common.MaskError(err)))
 		return
 	}
 	c.conns.Store(connID, conn)
 	c.send(connID, dcMsgConnectOK, nil)
-	log.Printf("dc-creator: CONNECTED %d -> %s", connID, common.MaskAddr(addr))
+	log.Printf("dc-creator: CONNECTED %d via %q -> %s", connID, egressID, common.MaskAddr(addr))
 	buf := make([]byte, dcReadBufSize)
 	for {
 		n, err := conn.Read(buf)

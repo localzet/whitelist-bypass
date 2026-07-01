@@ -113,7 +113,7 @@ func main() {
 	case "dc-joiner":
 		log.Fatal(androidbind.StartJoiner(*wsPort, *socksPort, *socksHost, *socksUser, *socksPass, cb))
 	case "dc-creator":
-		log.Fatal(startDCCreator(*wsPort))
+		log.Fatal(startDCCreator(*wsPort, egressRegistry))
 	case "vk-video-joiner":
 		c := pion.NewVKClient(log.Printf)
 		c.OnConnected = joinerCallback
