@@ -6,6 +6,7 @@ import androidx.core.content.edit
 import bypass.whitelist.tunnel.CallConfig
 import bypass.whitelist.tunnel.SplitTunnelingMode
 import bypass.whitelist.tunnel.TunnelMode
+import java.util.UUID
 
 object Prefs {
 
@@ -141,6 +142,16 @@ object Prefs {
             return try { ThemeMode.valueOf(name) } catch (_: IllegalArgumentException) { ThemeMode.SYSTEM }
         }
         set(value) = prefs.edit { putString(PrefsKeys.THEME_MODE, value.name) }
+
+    val serviceUserId: String
+        get() {
+            prefs.getString(PrefsKeys.SERVICE_USER_ID, null)?.let { stored ->
+                runCatching { UUID.fromString(stored).toString() }.getOrNull()?.let { return it }
+            }
+            return UUID.randomUUID().toString().also { value ->
+                prefs.edit(commit = true) { putString(PrefsKeys.SERVICE_USER_ID, value) }
+            }
+        }
 
     val activeDestination: CallConfig?
         get() {

@@ -26,7 +26,7 @@ import kotlin.concurrent.thread
 class HeadlessSessionService : Service() {
 
     private val logWriter by lazy { LogWriter(cacheDir) }
-    private var controller: HeadlessJoinController? = null
+    private var controller: JoinController? = null
     @Volatile private var sessionRunning: Boolean = false
     @Volatile private var stopInProgress: Boolean = false
 
@@ -92,70 +92,75 @@ class HeadlessSessionService : Service() {
         logWriter.append("Loading: ${config.url.trim()}")
         controller?.close()
         sessionRunning = true
-        controller = HeadlessJoinController(
-            applicationInfo.nativeLibraryDir,
-            object : JoinFragmentHost {
-                override fun appendLog(message: String) {
-                    logWriter.append(message)
-                    Log.d(TAG, message)
-                    TunnelServiceState.logCallback?.invoke(message)
-                }
+        val joinHost = object : JoinFragmentHost {
+            override fun appendLog(message: String) {
+                logWriter.append(message)
+                Log.d(TAG, message)
+                TunnelServiceState.logCallback?.invoke(message)
+            }
 
-                override fun onJoinStatus(status: VpnStatus) {
-                    updateNotification(getString(status.labelRes))
-                    TunnelServiceState.vpnStatusCallback?.invoke(status)
-                    if (status == VpnStatus.CALL_FAILED) {
-                        stopSession(stopDependentServices = true)
-                    }
-                }
-
-                override fun onJoinStatusText(text: String) {
-                    updateNotification(text)
-                }
-
-                override fun requestVpn() {
-                    if (Prefs.proxyOnly) {
-                        logWriter.append("Proxy only mode, skipping VPN")
-                        startService(Intent(this@HeadlessSessionService, ProxyService::class.java))
-                        updateNotification(getString(R.string.notification_proxy_title))
-                        TunnelServiceState.vpnStatusCallback?.invoke(VpnStatus.TUNNEL_ACTIVE)
-                        TunnelServiceState.requestTileRefresh(this@HeadlessSessionService)
-                        return
-                    }
-
-                    if (TunnelServiceState.hasForeignVpn(this@HeadlessSessionService)) {
-                        logWriter.append("Another VPN is active. Turn it off first.")
-                        updateNotification(getString(R.string.vpn_foreign_active))
-                        TunnelServiceState.vpnStatusCallback?.invoke(VpnStatus.VPN_CONFLICT)
-                        showToast(R.string.vpn_foreign_active)
-                        stopSession(stopDependentServices = true)
-                        return
-                    }
-
-                    if (VpnService.prepare(this@HeadlessSessionService) != null) {
-                        logWriter.append("VPN permission required")
-                        updateNotification(getString(R.string.tile_vpn_permission_required))
-                        showToast(R.string.tile_vpn_permission_required)
-                        stopSession(stopDependentServices = true)
-                        return
-                    }
-
-                    logWriter.append("VPN start requested")
-                    startService(Intent(this@HeadlessSessionService, TunnelVpnService::class.java))
-                    updateNotification(getString(R.string.vpn_starting))
-                    TunnelServiceState.vpnStatusCallback?.invoke(VpnStatus.STARTING)
-                    TunnelServiceState.requestTileRefresh(this@HeadlessSessionService)
-                }
-
-                override fun setJoinUiVisible(visible: Boolean) = Unit
-
-                override fun onJoinCancel() {
+            override fun onJoinStatus(status: VpnStatus) {
+                updateNotification(getString(status.labelRes))
+                TunnelServiceState.vpnStatusCallback?.invoke(status)
+                if (status == VpnStatus.CALL_FAILED) {
                     stopSession(stopDependentServices = true)
                 }
-            },
-            platform,
-            config.url.trim(),
-        )
+            }
+
+            override fun onJoinStatusText(text: String) {
+                updateNotification(text)
+            }
+
+            override fun requestVpn() {
+                if (Prefs.proxyOnly) {
+                    logWriter.append("Proxy only mode, skipping VPN")
+                    startService(Intent(this@HeadlessSessionService, ProxyService::class.java))
+                    updateNotification(getString(R.string.notification_proxy_title))
+                    TunnelServiceState.vpnStatusCallback?.invoke(VpnStatus.TUNNEL_ACTIVE)
+                    TunnelServiceState.requestTileRefresh(this@HeadlessSessionService)
+                    return
+                }
+
+                if (TunnelServiceState.hasForeignVpn(this@HeadlessSessionService)) {
+                    logWriter.append("Another VPN is active. Turn it off first.")
+                    updateNotification(getString(R.string.vpn_foreign_active))
+                    TunnelServiceState.vpnStatusCallback?.invoke(VpnStatus.VPN_CONFLICT)
+                    showToast(R.string.vpn_foreign_active)
+                    stopSession(stopDependentServices = true)
+                    return
+                }
+
+                if (VpnService.prepare(this@HeadlessSessionService) != null) {
+                    logWriter.append("VPN permission required")
+                    updateNotification(getString(R.string.tile_vpn_permission_required))
+                    showToast(R.string.tile_vpn_permission_required)
+                    stopSession(stopDependentServices = true)
+                    return
+                }
+
+                logWriter.append("VPN start requested")
+                startService(Intent(this@HeadlessSessionService, TunnelVpnService::class.java))
+                updateNotification(getString(R.string.vpn_starting))
+                TunnelServiceState.vpnStatusCallback?.invoke(VpnStatus.STARTING)
+                TunnelServiceState.requestTileRefresh(this@HeadlessSessionService)
+            }
+
+            override fun setJoinUiVisible(visible: Boolean) = Unit
+
+            override fun onJoinCancel() {
+                stopSession(stopDependentServices = true)
+            }
+        }
+        controller = if (config.serviceControl) {
+            ServiceJoinController(this, joinHost, config)
+        } else {
+            HeadlessJoinController(
+                applicationInfo.nativeLibraryDir,
+                joinHost,
+                platform,
+                config.url.trim(),
+            )
+        }
         controller?.start()
         TunnelServiceState.requestTileRefresh(this)
     }

@@ -13,7 +13,7 @@ class HeadlessJoinController(
     private val host: JoinFragmentHost,
     private val platform: CallPlatform,
     private val url: String,
-) : AutoCloseable {
+) : JoinController {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val vpnRequested = AtomicBoolean(false)
@@ -24,7 +24,7 @@ class HeadlessJoinController(
         onStatus = ::handleStatus,
     )
 
-    fun start() {
+    override fun start() {
         relay.start()
     }
 

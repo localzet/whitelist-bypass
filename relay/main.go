@@ -134,6 +134,9 @@ func main() {
 			if onConfigAck != nil {
 				bridge.SetOnConfigAck(onConfigAck)
 			}
+			if serviceCfg.Enabled {
+				go requestServiceSession(bridge, serviceCfg)
+			}
 			log.Printf("relay: tunnel swapped after reconnect")
 		}
 	}

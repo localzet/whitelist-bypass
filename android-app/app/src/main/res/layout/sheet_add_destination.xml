@@ -156,6 +156,46 @@
             android:textColor="@color/ink_3"
             android:textSize="11sp" />
 
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/inputServiceControl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="@string/sheet_service_control"
+            android:textColor="@color/ink"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/workPlatformContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="6dp"
+                android:fontFamily="monospace"
+                android:letterSpacing="0.16"
+                android:text="@string/sheet_work_platform"
+                android:textAllCaps="true"
+                android:textColor="@color/ink_3"
+                android:textSize="10sp" />
+
+            <AutoCompleteTextView
+                android:id="@+id/inputWorkPlatform"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_input"
+                android:completionThreshold="0"
+                android:inputType="none"
+                android:padding="12dp"
+                android:textColor="@color/ink"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

@@ -91,6 +91,9 @@
     <string name="sheet_field_name_hint">e.g. Standup VK</string>
     <string name="sheet_field_link_hint">https://&#8230;</string>
     <string name="sheet_field_egress_hint">default / de-fra-1 / nl-ams-1</string>
+    <string name="sheet_service_control">Use as service call</string>
+    <string name="sheet_work_platform">Work call platform</string>
+    <string name="sheet_service_wb_only">Service calls currently require a WB Stream link</string>
     <string name="sheet_save">Save call</string>
     <string name="sheet_save_short">Save</string>
     <string name="sheet_cancel">Cancel</string>

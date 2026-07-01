@@ -17,8 +17,10 @@ import androidx.fragment.app.FragmentManager
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import bypass.whitelist.R
 import bypass.whitelist.tunnel.CallConfig
+import bypass.whitelist.tunnel.CallPlatform
 import bypass.whitelist.tunnel.EgressDiscovery
 import bypass.whitelist.util.Prefs
+import com.google.android.material.materialswitch.MaterialSwitch
 
 class AddDestinationSheet : BottomSheetDialogFragment() {
 
@@ -33,6 +35,9 @@ class AddDestinationSheet : BottomSheetDialogFragment() {
         val inputLink = view.findViewById<EditText>(R.id.inputLink)
         val inputEgressId = view.findViewById<AutoCompleteTextView>(R.id.inputEgressId)
         val egressDiscoveryStatus = view.findViewById<TextView>(R.id.egressDiscoveryStatus)
+        val serviceControl = view.findViewById<MaterialSwitch>(R.id.inputServiceControl)
+        val workPlatformContainer = view.findViewById<LinearLayout>(R.id.workPlatformContainer)
+        val inputWorkPlatform = view.findViewById<AutoCompleteTextView>(R.id.inputWorkPlatform)
         val pasteChip = view.findViewById<LinearLayout>(R.id.pasteChip)
         val pasteChipLabel = view.findViewById<TextView>(R.id.pasteChipLabel)
         val buttonCancel = view.findViewById<Button>(R.id.buttonCancel)
@@ -41,6 +46,13 @@ class AddDestinationSheet : BottomSheetDialogFragment() {
         inputEgressId.setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, EgressDiscovery.ids()))
         inputEgressId.setOnClickListener { inputEgressId.showDropDown() }
         egressDiscoveryStatus.text = EgressDiscovery.summary()
+        val workPlatforms = CallPlatform.entries
+        inputWorkPlatform.setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, workPlatforms.map { it.name }))
+        inputWorkPlatform.setText(CallPlatform.TELEMOST.name, false)
+        inputWorkPlatform.setOnClickListener { inputWorkPlatform.showDropDown() }
+        serviceControl.setOnCheckedChangeListener { _, checked ->
+            workPlatformContainer.visibility = if (checked) View.VISIBLE else View.GONE
+        }
 
         pasteChip.setOnClickListener {
             val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -67,7 +79,23 @@ class AddDestinationSheet : BottomSheetDialogFragment() {
             }
             val name = inputName.text.toString().trim().ifEmpty { CallConfig.suggestNameFor(link) }
             val egressId = inputEgressId.text.toString().trim().ifEmpty { null }
-            val config = CallConfig.newWith(name = name, url = link).copy(egressId = egressId)
+            if (serviceControl.isChecked && CallPlatform.fromUrl(link) != CallPlatform.WBSTREAM) {
+                inputLink.error = getString(R.string.sheet_service_wb_only)
+                inputLink.requestFocus()
+                return@setOnClickListener
+            }
+            val workPlatform = inputWorkPlatform.text.toString().let { value ->
+                workPlatforms.firstOrNull { it.name == value }
+            }
+            if (serviceControl.isChecked && workPlatform == null) {
+                inputWorkPlatform.requestFocus()
+                return@setOnClickListener
+            }
+            val config = CallConfig.newWith(name = name, url = link).copy(
+                egressId = egressId,
+                serviceControl = serviceControl.isChecked,
+                workPlatform = workPlatform.takeIf { serviceControl.isChecked },
+            )
             Prefs.addDestination(config)
             (parentFragment as? CallsListener)?.onDestinationsChanged()
             (activity as? CallsListener)?.onDestinationsChanged()

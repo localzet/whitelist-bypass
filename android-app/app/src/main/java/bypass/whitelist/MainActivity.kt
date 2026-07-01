@@ -27,6 +27,8 @@ import androidx.viewpager2.widget.ViewPager2
 import bypass.whitelist.tunnel.CallConfig
 import bypass.whitelist.tunnel.CallPlatform
 import bypass.whitelist.tunnel.HeadlessJoinController
+import bypass.whitelist.tunnel.JoinController
+import bypass.whitelist.tunnel.ServiceJoinController
 import bypass.whitelist.tunnel.HeadlessSessionService
 import bypass.whitelist.tunnel.PortGuard
 import bypass.whitelist.tunnel.ProxyService
@@ -85,7 +87,7 @@ class MainActivity :
     private var lastStatus: VpnStatus? = null
     private var connected: Boolean = false
     private var activeJoinUrl: String = ""
-    private var activeHeadlessController: HeadlessJoinController? = null
+    private var activeHeadlessController: JoinController? = null
     private var navPageChangeCallback: ViewPager2.OnPageChangeCallback? = null
     private var navScrollState: Int = ViewPager2.SCROLL_STATE_IDLE
     @Volatile private var resetInProgress: Boolean = false
@@ -698,17 +700,21 @@ class MainActivity :
         mainFragment()?.onStatusChanged(VpnStatus.CONNECTING)
         mainFragment()?.onConnectedChanged(false)
 
-        val headlessMode =
+        val headlessMode = config.serviceControl ||
             Prefs.headless || platform == CallPlatform.WBSTREAM || platform == CallPlatform.DION
 
         if (headlessMode && platform != CallPlatform.VK) {
             setJoinOverlayVisible(false)
-            activeHeadlessController = HeadlessJoinController(
-                applicationInfo.nativeLibraryDir,
-                this,
-                platform,
-                url,
-            ).also { it.start() }
+            activeHeadlessController = if (config.serviceControl) {
+                ServiceJoinController(this, this, config)
+            } else {
+                HeadlessJoinController(
+                    applicationInfo.nativeLibraryDir,
+                    this,
+                    platform,
+                    url,
+                )
+            }.also { it.start() }
             return
         }
 

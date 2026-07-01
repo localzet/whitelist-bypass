@@ -71,6 +71,7 @@ object PrefsKeys {
     const val THEME_MODE = "theme_mode"
     const val DISCOVERED_EGRESS_LIST = "discovered_egress_list"
     const val DISCOVERED_EGRESS_PROBES = "discovered_egress_probes"
+    const val SERVICE_USER_ID = "service_user_id"
 }
 
 object VP8Defaults {
