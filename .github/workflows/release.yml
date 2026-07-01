@@ -129,12 +129,6 @@ jobs:
             goos: windows
             goarch: '386'
             ext: '.exe'
-          - os: macos-latest
-            platform: mac
-            arch: universal
-            goos: darwin
-            goarch: universal
-            ext: ''
     steps:
       - uses: actions/checkout@v4
 
@@ -157,19 +151,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ matrix.platform }}" = "mac" ]; then
-            GOOS=darwin GOARCH=amd64 go -C relay build -trimpath -ldflags="-s -w" -o relay-darwin-amd64 .
-            GOOS=darwin GOARCH=arm64 go -C relay build -trimpath -ldflags="-s -w" -o relay-darwin-arm64 .
-            lipo -create -output relay/relay-darwin relay/relay-darwin-amd64 relay/relay-darwin-arm64
-
-            for component in vk telemost wbstream dion; do
-              GOOS=darwin GOARCH=amd64 go -C "headless/$component" build -trimpath -ldflags="-s -w" -o "../headless-$component-darwin-amd64" .
-              GOOS=darwin GOARCH=arm64 go -C "headless/$component" build -trimpath -ldflags="-s -w" -o "../headless-$component-darwin-arm64" .
-              lipo -create -output "headless/headless-$component-darwin" "headless/headless-$component-darwin-amd64" "headless/headless-$component-darwin-arm64"
-            done
-            exit 0
-          fi
-
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C relay build -trimpath -ldflags="-s -w" -o "relay-bundle${{ matrix.ext }}" .
           for component in vk telemost wbstream dion; do
             GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C "headless/$component" build -trimpath -ldflags="-s -w" -o "../headless-$component-bundle${{ matrix.ext }}" .
@@ -182,11 +163,7 @@ jobs:
           npm ci --prefix creator-app
           npm run build --prefix creator-app
           cd creator-app
-          if [ "${{ matrix.platform }}" = "mac" ]; then
-            npx electron-builder --mac --universal --publish never
-          else
-            npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
-          fi
+          npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
           cd ..
           ./clean-prebuilts.sh
 
@@ -225,12 +202,6 @@ jobs:
             goarch: '386'
             wintun_arch: x86
             ext: '.exe'
-          - os: macos-latest
-            platform: mac
-            arch: universal
-            goos: darwin
-            goarch: universal
-            ext: ''
     steps:
       - uses: actions/checkout@v4
 
@@ -254,13 +225,6 @@ jobs:
         run: |
           set -euo pipefail
           cd joiner-desktop-app/desktop-joiner
-          if [ "${{ matrix.platform }}" = "mac" ]; then
-            GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o desktop-joiner-darwin-amd64 .
-            GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o desktop-joiner-darwin-arm64 .
-            lipo -create -output desktop-joiner-darwin desktop-joiner-darwin-amd64 desktop-joiner-darwin-arm64
-            exit 0
-          fi
-
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags="-s -w" -o "desktop-joiner-bundle${{ matrix.ext }}" .
           if [ "${{ matrix.platform }}" = "win" ]; then
             curl -L -o wintun.zip https://www.wintun.net/builds/wintun-0.14.1.zip
@@ -277,11 +241,7 @@ jobs:
           npm ci --prefix joiner-desktop-app
           npm run build --prefix joiner-desktop-app
           cd joiner-desktop-app
-          if [ "${{ matrix.platform }}" = "mac" ]; then
-            npx electron-builder --mac --universal --publish never
-          else
-            npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
-          fi
+          npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
           cd ..
           ./clean-prebuilts.sh
 

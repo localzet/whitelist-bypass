@@ -394,7 +394,22 @@ Throughput ≈ `fps × batch × 1126 байт/кадр`. Примеры:
 
 На iOS доступен только режим SOCKS5 прокси (без VPN). Для проксирования всего трафика устройства используйте VPN-приложение с поддержкой SOCKS5 (например Happ, Shadowrocket или Streisand).
 
-1. Скачайте `whitelist-bypass-proxy.ipa` (unsigned) из [GitHub Releases](https://github.com/kulikov0/whitelist-bypass/releases) и установите его. Подробная инструкция по установке unsigned IPA на iPhone: [habr.com/ru/articles/1013990/](https://habr.com/ru/articles/1013990/). Либо соберите из исходников (см. README).
+### Установка IPA
+
+Файл `whitelist-bypass-proxy.ipa` из [GitHub Releases](https://github.com/kulikov0/whitelist-bypass/releases) является **unsigned IPA**. Его нельзя просто открыть как APK на Android: iOS требует подписать приложение Apple ID или developer-сертификатом перед установкой.
+
+Варианты установки:
+
+- **AltStore / SideStore** - удобный вариант для обычного Apple ID. Установите AltStore на iPhone, импортируйте `whitelist-bypass-proxy.ipa` и дождитесь подписи. Ограничение бесплатного Apple ID: приложение нужно обновлять примерно раз в 7 дней.
+- **Sideloadly** - подключите iPhone по USB, выберите IPA, войдите Apple ID и установите. После установки на iPhone откройте **Settings -> General -> VPN & Device Management** и доверяйте профилю разработчика.
+- **Xcode** - соберите проект из исходников, выберите свой Team в Signing & Capabilities и установите на устройство. Это удобнее для разработки.
+- **Платный Apple Developer аккаунт / enterprise MDM** - подпишите IPA своим сертификатом; срок действия будет больше, чем у бесплатного Apple ID.
+
+После установки откройте приложение один раз вручную. Если iOS пишет, что разработчик не доверен, зайдите в **Settings -> General -> VPN & Device Management** и нажмите **Trust** для профиля Apple ID, которым подписывали IPA.
+
+### Использование
+
+1. Установите `whitelist-bypass-proxy.ipa` одним из способов выше. Подробная сторонняя инструкция по unsigned IPA: [habr.com/ru/articles/1013990/](https://habr.com/ru/articles/1013990/).
 2. Установите любое VPN-приложение с поддержкой SOCKS5 (Happ, Shadowrocket, Streisand и т.п.).
 3. Откройте whitelist-bypass, выберите режим туннеля (**DC** или **Video**), вставьте ссылку на звонок и нажмите **Go**. Headless-creator подстроится под выбранный режим автоматически.
 4. Дождитесь статуса "Tunnel Active". Приложение покажет адрес SOCKS5 прокси (например `socks5://user:pass@127.0.0.1:1081`).
