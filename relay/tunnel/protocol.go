@@ -22,6 +22,8 @@ const (
 	MsgEgressList         byte = 0x0E
 	MsgEgressProbeRequest byte = 0x0F
 	MsgEgressProbeResult  byte = 0x10
+	MsgSessionCreate      byte = 0x11
+	MsgSessionReady       byte = 0x12
 )
 
 const ControlConnID uint32 = 0
@@ -36,14 +38,14 @@ type DataTunnel interface {
 }
 
 type ClientHello struct {
-	ProtocolVersion  int      `json:"protocolVersion"`
-	Capabilities     []string `json:"capabilities,omitempty"`
+	ProtocolVersion   int      `json:"protocolVersion"`
+	Capabilities      []string `json:"capabilities,omitempty"`
 	RequestedEgressID string   `json:"requestedEgressId,omitempty"`
 }
 
 type ServerHello struct {
-	ProtocolVersion int      `json:"protocolVersion"`
-	Capabilities    []string `json:"capabilities,omitempty"`
+	ProtocolVersion  int      `json:"protocolVersion"`
+	Capabilities     []string `json:"capabilities,omitempty"`
 	SelectedEgressID string   `json:"selectedEgressId"`
 }
 
@@ -72,14 +74,30 @@ type EgressProbeResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
+type SessionCreateRequest struct {
+	RequestID string `json:"requestId"`
+	UserID    string `json:"userId,omitempty"`
+	EgressID  string `json:"egressId"`
+	Platform  string `json:"platform,omitempty"`
+	Mode      string `json:"mode,omitempty"`
+}
+
+type SessionReady struct {
+	RequestID  string `json:"requestId"`
+	SessionID  string `json:"sessionId"`
+	JoinLink   string `json:"joinLink"`
+	EgressID   string `json:"egressId"`
+	TTLSeconds int64  `json:"ttlSeconds"`
+}
+
 func EncodeClientHello(requestedEgressID string) []byte {
 	return EncodeFrame(ControlConnID, MsgClientHello, EncodeClientHelloPayload(requestedEgressID))
 }
 
 func EncodeClientHelloPayload(requestedEgressID string) []byte {
 	return encodeControlJSON(ClientHello{
-		ProtocolVersion:  ControlProtocolVersion,
-		Capabilities:     []string{"egress-select", "egress-discovery", "egress-probe"},
+		ProtocolVersion:   ControlProtocolVersion,
+		Capabilities:      []string{"egress-select", "egress-discovery", "egress-probe"},
 		RequestedEgressID: requestedEgressID,
 	})
 }
@@ -90,8 +108,8 @@ func EncodeServerHello(selectedEgressID string) []byte {
 
 func EncodeServerHelloPayload(selectedEgressID string) []byte {
 	return encodeControlJSON(ServerHello{
-		ProtocolVersion: ControlProtocolVersion,
-		Capabilities:    []string{"egress-select", "egress-discovery", "egress-probe"},
+		ProtocolVersion:  ControlProtocolVersion,
+		Capabilities:     []string{"egress-select", "egress-discovery", "egress-probe"},
 		SelectedEgressID: selectedEgressID,
 	})
 }
@@ -171,6 +189,30 @@ func DecodeEgressProbeResult(payload []byte) (EgressProbeResult, bool) {
 		return msg, false
 	}
 	return msg, msg.ID != "" && msg.LatencyMS >= 0
+}
+
+func EncodeSessionCreatePayload(request SessionCreateRequest) []byte {
+	return encodeControlJSON(request)
+}
+
+func DecodeSessionCreate(payload []byte) (SessionCreateRequest, bool) {
+	var msg SessionCreateRequest
+	if !decodeControlJSON(payload, &msg) {
+		return msg, false
+	}
+	return msg, msg.RequestID != ""
+}
+
+func EncodeSessionReadyPayload(session SessionReady) []byte {
+	return encodeControlJSON(session)
+}
+
+func DecodeSessionReady(payload []byte) (SessionReady, bool) {
+	var msg SessionReady
+	if !decodeControlJSON(payload, &msg) {
+		return msg, false
+	}
+	return msg, msg.RequestID != "" && msg.SessionID != "" && msg.JoinLink != "" && msg.EgressID != "" && msg.TTLSeconds > 0
 }
 
 func decodeControlJSON(payload []byte, value any) bool {

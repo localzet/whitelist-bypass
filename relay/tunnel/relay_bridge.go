@@ -46,28 +46,28 @@ type udpClient struct {
 }
 
 type RelayBridge struct {
-	tunnelMu    sync.RWMutex
-	tunnel      DataTunnel
-	conns       sync.Map
-	udpClients  sync.Map
-	udpSessions sync.Map
-	nackedConns sync.Map
-	nextID      atomic.Uint32
-	logFn       func(string, ...any)
-	mode        string
-	readBuf     int
-	ready       chan struct{}
-	once        sync.Once
-	socksUser   string
-	socksPass   string
-	egressMu    sync.RWMutex
-	egressReg   *egress.Registry
-	dialer      egress.Dialer
-	egressID    string
+	tunnelMu          sync.RWMutex
+	tunnel            DataTunnel
+	conns             sync.Map
+	udpClients        sync.Map
+	udpSessions       sync.Map
+	nackedConns       sync.Map
+	nextID            atomic.Uint32
+	logFn             func(string, ...any)
+	mode              string
+	readBuf           int
+	ready             chan struct{}
+	once              sync.Once
+	socksUser         string
+	socksPass         string
+	egressMu          sync.RWMutex
+	egressReg         *egress.Registry
+	dialer            egress.Dialer
+	egressID          string
 	requestedEgressID string
-	handshakeDone chan struct{}
-	handshakeOnce sync.Once
-	handshakeErr  atomic.Value
+	handshakeDone     chan struct{}
+	handshakeOnce     sync.Once
+	handshakeErr      atomic.Value
 
 	persistentListener atomic.Bool
 	listenerMu         sync.Mutex
@@ -79,6 +79,12 @@ type RelayBridge struct {
 
 	onConfigAckMu sync.Mutex
 	onConfigAck   func()
+
+	onSessionCreateMu sync.Mutex
+	onSessionCreate   func(SessionCreateRequest) (SessionReady, error)
+
+	onSessionReadyMu sync.Mutex
+	onSessionReady   func(SessionReady)
 }
 
 func (rb *RelayBridge) SetOnPeerConfig(fn func(fps, batch, trackCount int)) {
@@ -91,6 +97,22 @@ func (rb *RelayBridge) SetOnConfigAck(fn func()) {
 	rb.onConfigAckMu.Lock()
 	rb.onConfigAck = fn
 	rb.onConfigAckMu.Unlock()
+}
+
+func (rb *RelayBridge) SetOnSessionCreate(fn func(SessionCreateRequest) (SessionReady, error)) {
+	rb.onSessionCreateMu.Lock()
+	rb.onSessionCreate = fn
+	rb.onSessionCreateMu.Unlock()
+}
+
+func (rb *RelayBridge) SetOnSessionReady(fn func(SessionReady)) {
+	rb.onSessionReadyMu.Lock()
+	rb.onSessionReady = fn
+	rb.onSessionReadyMu.Unlock()
+}
+
+func (rb *RelayBridge) RequestSession(request SessionCreateRequest) {
+	rb.send(ControlConnID, MsgSessionCreate, EncodeSessionCreatePayload(request))
 }
 
 func NewRelayBridgeWithAuth(tunnel DataTunnel, mode string, readBuf int, logFn func(string, ...any), socksUser, socksPass string) *RelayBridge {
@@ -448,6 +470,46 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 			}
 			return
 		}
+		if connID == ControlConnID && msgType == MsgSessionCreate {
+			if rb.mode == "creator" {
+				request, ok := DecodeSessionCreate(payload)
+				if !ok {
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("bad_session_request", "invalid session request"))
+					return
+				}
+				rb.onSessionCreateMu.Lock()
+				cb := rb.onSessionCreate
+				rb.onSessionCreateMu.Unlock()
+				if cb == nil {
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("session_control_unavailable", "session control is not available"))
+					return
+				}
+				session, err := cb(request)
+				if err != nil {
+					rb.logFn("relay: session create failed: %v", err)
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("session_create_failed", common.MaskError(err)))
+					return
+				}
+				rb.send(ControlConnID, MsgSessionReady, EncodeSessionReadyPayload(session))
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgSessionReady {
+			if rb.mode == "joiner" {
+				session, ok := DecodeSessionReady(payload)
+				if !ok {
+					rb.logFn("relay: invalid session ready response")
+					return
+				}
+				rb.onSessionReadyMu.Lock()
+				cb := rb.onSessionReady
+				rb.onSessionReadyMu.Unlock()
+				if cb != nil {
+					cb(session)
+				}
+			}
+			return
+		}
 		switch rb.mode {
 		case "joiner":
 			rb.handleJoinerMessage(connID, msgType, payload)
@@ -716,6 +778,7 @@ func (rb *RelayBridge) logDNS(connID uint32, host, port string) {
 	}
 	rb.logFn("relay: DNS %d %s -> %s port=%s took=%s", connID, host, ipAddrList(ips), port, time.Since(dnsStart))
 }
+
 type socksConn struct {
 	id   uint32
 	conn net.Conn
@@ -808,7 +871,7 @@ func (rb *RelayBridge) handleSOCKS(conn net.Conn) {
 	}
 	// Dial local/private addresses directly instead of tunneling to the creator,
 	// which cannot reach the joiner's local network. Disabled for now until
-	// there is a real use case for local network access through the proxy. So idk if 
+	// there is a real use case for local network access through the proxy. So idk if
 	// this is a bug or a feature
 	// if ip := net.ParseIP(hostOnly); ip != nil && !ip.IsGlobalUnicast() {
 	// 	rb.logFn("relay: SOCKS local dial %s", common.MaskAddr(host))

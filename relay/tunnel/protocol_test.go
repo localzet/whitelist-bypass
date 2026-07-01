@@ -20,3 +20,29 @@ func TestEgressDiscoveryPayloads(t *testing.T) {
 		t.Fatalf("probe result round trip = %+v, %v", result, ok)
 	}
 }
+
+func TestSessionControlPayloads(t *testing.T) {
+	wantRequest := SessionCreateRequest{
+		RequestID: "req-1",
+		UserID:    "user-1",
+		EgressID:  "de-fra-1",
+		Platform:  "telemost",
+		Mode:      "video",
+	}
+	request, ok := DecodeSessionCreate(EncodeSessionCreatePayload(wantRequest))
+	if !ok || request != wantRequest {
+		t.Fatalf("session create round trip = %+v, %v", request, ok)
+	}
+
+	wantReady := SessionReady{
+		RequestID:  "req-1",
+		SessionID:  "sess-1",
+		JoinLink:   "https://telemost.yandex.ru/j/abc",
+		EgressID:   "de-fra-1",
+		TTLSeconds: 600,
+	}
+	ready, ok := DecodeSessionReady(EncodeSessionReadyPayload(wantReady))
+	if !ok || ready != wantReady {
+		t.Fatalf("session ready round trip = %+v, %v", ready, ok)
+	}
+}

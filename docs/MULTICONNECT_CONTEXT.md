@@ -296,3 +296,16 @@ git status --short
 6. integration test двух upstream-профилей.
 
 UI и persistence не следует начинать до фиксации схемы и протокольного контракта: иначе Android и desktop независимо закрепят несовместимые модели.
+
+## 12. Итерация server control plane
+
+Критичное эксплуатационное ограничение: в условиях активных блокировок joiner не должен зависеть от обычного HTTP/WebSocket API до creator-сервера. Такой API может быть полезен для локальной панели администратора, но не должен быть обязательным каналом между клиентом и сервером. Управляющий обмен между joiner и creator должен идти через уже разрешённый транспорт звонка.
+
+Первая реализационная итерация добавляет call-carried session control:
+
+- `MsgSessionCreate` — joiner отправляет через служебный звонок `requestId`, `egressId`, опциональные `platform` и `mode`;
+- `MsgSessionReady` — creator отвечает `sessionId`, рабочей `joinLink`, подтверждённым `egressId` и TTL;
+- `RelayBridge.RequestSession`, `SetOnSessionCreate`, `SetOnSessionReady` — транспорт только доставляет control messages, а создание звонков остаётся в orchestration-слое;
+- `relay/controlplane.Manager` — удерживает лимиты: максимум один service session и один work session на пользователя, idempotency по `(userId, requestId)`, TTL cleanup и замену старого work session при переключении egress.
+
+Следующая итерация должна добавить реальный `creator-service`, который подключит `SetOnSessionCreate` к фабрике headless-звонков. Он должен создавать рабочий звонок только после получения `MsgSessionCreate` по служебному звонку, а не через обязательный внешний API.

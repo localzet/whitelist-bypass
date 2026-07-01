@@ -7,6 +7,7 @@ set -eu
 BINS_DIR="${BINS_DIR:-/opt/wlb/bin}"
 SESSIONS_DIR="${SESSIONS_DIR:-/data/sessions}"
 RESOURCES="${RESOURCES:-default}"
+EGRESS_CONFIG="${EGRESS_CONFIG:-}"
 
 VK_COOKIES_DEFAULT="/data/cookies-vk.json"
 TM_COOKIES_DEFAULT="/data/cookies-yandex.json"
@@ -38,5 +39,6 @@ set -- \
 [ -n "${UPSTREAM_SOCKS:-}" ] && set -- "$@" --upstream-socks "$UPSTREAM_SOCKS"
 [ -n "${UPSTREAM_USER:-}" ] && set -- "$@" --upstream-user "$UPSTREAM_USER"
 [ -n "${UPSTREAM_PASS:-}" ] && set -- "$@" --upstream-pass "$UPSTREAM_PASS"
+[ -n "$EGRESS_CONFIG" ] && set -- "$@" --egress-config "$EGRESS_CONFIG"
 
 exec /usr/local/bin/headless-vk-bot "$@"

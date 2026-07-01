@@ -16,6 +16,9 @@ services:
       - ./cookies-yandex.json:/data/cookies-yandex.json:ro
       - ./cookies-wbstream.json:/data/cookies-wbstream.json:ro
       - ./cookies-dion.json:/data/cookies-dion.json:ro
+      # Optional multiconnect egress profile config.
+      # Set EGRESS_CONFIG=/config/egresses.json in .env to enable it.
+      - ../../docs/egresses.example.json:/config/egresses.json:ro
       # Per-session creator logs persist here.
       - bot-sessions:/data/sessions
 
