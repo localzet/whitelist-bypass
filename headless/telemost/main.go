@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v4"
 	"whitelist-bypass/relay/common"
+	"whitelist-bypass/relay/egress"
 	tmapi "whitelist-bypass/relay/telemost"
 	"whitelist-bypass/relay/tunnel"
 )
@@ -57,6 +58,7 @@ type Bridge struct {
 	upstreamSocks string
 	upstreamUser  string
 	upstreamPass  string
+	egressReg     *egress.Registry
 
 	setSlotsKey    int
 	initBundleSent bool
@@ -710,11 +712,11 @@ func (b *Bridge) initRelay() {
 	relay.OnConnected = func(tun *tunnel.VP8DataTunnel) {
 		if b.activeBridge != nil {
 			b.activeBridge.Reset()
-		}
-		b.activeBridge = tunnel.NewRelayBridge(tun, "creator", common.VP8BufSize, log.Printf)
-		b.activeBridge.SetUpstreamSocks(b.upstreamSocks, b.upstreamUser, b.upstreamPass)
-		fmt.Print("\n  TUNNEL CONNECTED\n")
 	}
+	b.activeBridge = tunnel.NewRelayBridge(tun, "creator", common.VP8BufSize, log.Printf)
+	b.activeBridge.SetEgressRegistry(b.egressReg)
+	fmt.Print("\n  TUNNEL CONNECTED\n")
+}
 	relay.OnPeerRestart = func() {
 		if b.activeBridge != nil {
 			log.Printf("[relay] new peer detected, resetting relay bridge")
@@ -891,7 +893,9 @@ func main() {
 	upstreamSocks := flag.String("upstream-socks", "", "route tunneled egress through this SOCKS5 proxy (host:port), e.g. a local VPN client")
 	upstreamUser := flag.String("upstream-user", "", "upstream SOCKS5 username")
 	upstreamPass := flag.String("upstream-pass", "", "upstream SOCKS5 password")
+	egressConfig := flag.String("egress-config", "", "JSON egress profile config")
 	flag.Parse()
+	egressRegistry := loadEgressRegistry(*egressConfig, *upstreamSocks, *upstreamUser, *upstreamPass)
 
 	var readBuf int
 	var memLimit int64
@@ -974,6 +978,26 @@ func main() {
 		upstreamSocks: *upstreamSocks,
 		upstreamUser:  *upstreamUser,
 		upstreamPass:  *upstreamPass,
+		egressReg:     egressRegistry,
 	}
 	bridge.run()
+}
+
+func loadEgressRegistry(configPath, upstreamSocks, upstreamUser, upstreamPass string) *egress.Registry {
+	if configPath != "" && (upstreamSocks != "" || upstreamUser != "" || upstreamPass != "") {
+		log.Fatalf("[config] --egress-config cannot be combined with --upstream-*")
+	}
+	if configPath != "" {
+		reg, err := egress.LoadConfig(configPath)
+		if err != nil {
+			log.Fatalf("[config] egress config: %v", err)
+		}
+		log.Printf("[config] loaded egress config from %s", configPath)
+		return reg
+	}
+	reg, err := egress.LegacySOCKSRegistry(upstreamSocks, upstreamUser, upstreamPass)
+	if err != nil {
+		log.Fatalf("[config] legacy upstream: %v", err)
+	}
+	return reg
 }

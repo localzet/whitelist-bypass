@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v4"
 	"whitelist-bypass/relay/common"
+	"whitelist-bypass/relay/egress"
 	"whitelist-bypass/relay/tunnel"
 )
 
@@ -635,7 +636,9 @@ func main() {
 	upstreamSocks := flag.String("upstream-socks", "", "route tunneled egress through this SOCKS5 proxy (host:port), e.g. a local VPN client")
 	upstreamUser := flag.String("upstream-user", "", "upstream SOCKS5 username")
 	upstreamPass := flag.String("upstream-pass", "", "upstream SOCKS5 password")
+	egressConfig := flag.String("egress-config", "", "JSON egress profile config")
 	flag.Parse()
+	egressRegistry := loadEgressRegistry(*egressConfig, *upstreamSocks, *upstreamUser, *upstreamPass)
 
 	var readBuf int
 	var maxDCBuf uint64
@@ -733,7 +736,7 @@ func main() {
 		ur.SetObfuscator(obf)
 		ur.OnConnected = func(tun tunnel.DataTunnel) {
 			rb := tunnel.NewRelayBridge(tun, "creator", common.VP8BufSize, log.Printf)
-			rb.SetUpstreamSocks(*upstreamSocks, *upstreamUser, *upstreamPass)
+			rb.SetEgressRegistry(egressRegistry)
 			if st, ok := tun.(*tunnel.SymmetricScreenTunnel); ok {
 				rb.SetOnPeerConfig(func(fps, batch, trackCount int) {
 					st.SetTrackCount(trackCount)
@@ -744,4 +747,23 @@ func main() {
 		return ur
 	}
 	bridge.run(callInfo, cookieStr, cfg)
+}
+
+func loadEgressRegistry(configPath, upstreamSocks, upstreamUser, upstreamPass string) *egress.Registry {
+	if configPath != "" && (upstreamSocks != "" || upstreamUser != "" || upstreamPass != "") {
+		log.Fatalf("[config] --egress-config cannot be combined with --upstream-*")
+	}
+	if configPath != "" {
+		reg, err := egress.LoadConfig(configPath)
+		if err != nil {
+			log.Fatalf("[config] egress config: %v", err)
+		}
+		log.Printf("[config] loaded egress config from %s", configPath)
+		return reg
+	}
+	reg, err := egress.LegacySOCKSRegistry(upstreamSocks, upstreamUser, upstreamPass)
+	if err != nil {
+		log.Fatalf("[config] legacy upstream: %v", err)
+	}
+	return reg
 }

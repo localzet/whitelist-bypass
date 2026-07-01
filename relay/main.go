@@ -10,6 +10,7 @@ import (
 
 	"whitelist-bypass/relay/androidbind"
 	"whitelist-bypass/relay/common"
+	"whitelist-bypass/relay/egress"
 	"whitelist-bypass/relay/pion"
 	"whitelist-bypass/relay/pion/android"
 	"whitelist-bypass/relay/tunnel"
@@ -28,9 +29,11 @@ func main() {
 	socksPort := flag.Int("socks-port", 1080, "SOCKS5 proxy port (joiner mode only)")
 	socksUser := flag.String("socks-user", "", "SOCKS5 proxy username")
 	socksPass := flag.String("socks-pass", "", "SOCKS5 proxy password")
+	egressID := flag.String("egress-id", "", "joiner mode: creator egress profile id")
 	upstreamSocks := flag.String("upstream-socks", "", "creator mode: route tunneled egress through this SOCKS5 proxy (host:port), e.g. a local VPN client")
 	upstreamUser := flag.String("upstream-user", "", "upstream SOCKS5 username")
 	upstreamPass := flag.String("upstream-pass", "", "upstream SOCKS5 password")
+	egressConfig := flag.String("egress-config", "", "creator mode: JSON egress profile config")
 	flag.String("local-ip", "", "local IP address (unused, passed via hook)")
 	flag.Parse()
 
@@ -38,6 +41,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage: relay --mode dc-joiner|dc-creator|vk-video-joiner|vk-video-creator|telemost-video-joiner|telemost-video-creator\n")
 		os.Exit(1)
 	}
+	egressRegistry := loadEgressRegistry(*egressConfig, *upstreamSocks, *upstreamUser, *upstreamPass)
 
 	cb := stdLogger{}
 
@@ -55,6 +59,7 @@ func main() {
 
 	startJoinerBridge := func(tun tunnel.DataTunnel, readBuf int) {
 		rb := tunnel.NewRelayBridgeWithAuth(tun, "joiner", readBuf, log.Printf, *socksUser, *socksPass)
+		rb.SetRequestedEgressID(*egressID)
 		rb.MarkReady()
 		go rb.ListenSOCKS(fmt.Sprintf("%s:%d", *socksHost, *socksPort))
 	}
@@ -65,7 +70,7 @@ func main() {
 
 	creatorCallback := func(tun tunnel.DataTunnel) {
 		rb := tunnel.NewRelayBridge(tun, "creator", common.VP8BufSize, log.Printf)
-		rb.SetUpstreamSocks(*upstreamSocks, *upstreamUser, *upstreamPass)
+		rb.SetEgressRegistry(egressRegistry)
 	}
 
 	newPersistentJoinerBridge := func(onConfigAck func()) func(tunnel.DataTunnel) {
@@ -82,6 +87,7 @@ func main() {
 			defer bridgeMu.Unlock()
 			if bridge == nil {
 				bridge = tunnel.NewRelayBridgeWithAuth(tun, "joiner", readBuf, log.Printf, *socksUser, *socksPass)
+				bridge.SetRequestedEgressID(*egressID)
 				if onConfigAck != nil {
 					bridge.SetOnConfigAck(onConfigAck)
 				}
@@ -144,4 +150,23 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unknown mode: %s\n", *mode)
 		os.Exit(1)
 	}
+}
+
+func loadEgressRegistry(configPath, upstreamSocks, upstreamUser, upstreamPass string) *egress.Registry {
+	if configPath != "" && (upstreamSocks != "" || upstreamUser != "" || upstreamPass != "") {
+		log.Fatalf("[config] --egress-config cannot be combined with --upstream-*")
+	}
+	if configPath != "" {
+		reg, err := egress.LoadConfig(configPath)
+		if err != nil {
+			log.Fatalf("[config] egress config: %v", err)
+		}
+		log.Printf("[config] loaded egress config from %s", configPath)
+		return reg
+	}
+	reg, err := egress.LegacySOCKSRegistry(upstreamSocks, upstreamUser, upstreamPass)
+	if err != nil {
+		log.Fatalf("[config] legacy upstream: %v", err)
+	}
+	return reg
 }

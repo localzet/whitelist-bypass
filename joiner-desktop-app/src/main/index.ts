@@ -118,6 +118,7 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
   ];
   if (settings.socksUser) args.push('--socks-user', settings.socksUser);
   if (settings.socksPass) args.push('--socks-pass', settings.socksPass);
+  if (settings.egressId) args.push('--egress-id', settings.egressId);
   if (noTun) args.push('--no-tun');
   if (settings.dualTrack && (settings.platform === 'vk' || settings.platform === 'wbstream')) {
     args.push('--dual-track');

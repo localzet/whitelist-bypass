@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"whitelist-bypass/relay/common"
+	"whitelist-bypass/relay/egress"
 	"whitelist-bypass/relay/tunnel"
 	"whitelist-bypass/relay/wbstream"
 )
@@ -25,7 +26,9 @@ func main() {
 	upstreamSocks := flag.String("upstream-socks", "", "route tunneled egress through this SOCKS5 proxy (host:port), e.g. a local VPN client")
 	upstreamUser := flag.String("upstream-user", "", "upstream SOCKS5 username")
 	upstreamPass := flag.String("upstream-pass", "", "upstream SOCKS5 password")
+	egressConfig := flag.String("egress-config", "", "JSON egress profile config")
 	flag.Parse()
+	egressRegistry := loadEgressRegistry(*egressConfig, *upstreamSocks, *upstreamUser, *upstreamPass)
 
 	var readBuf int
 	var memLimit int64
@@ -116,7 +119,7 @@ func main() {
 				mode = "dc"
 			}
 			activeBridge = tunnel.NewRelayBridge(tun, "creator", bridgeReadBuf, log.Printf)
-			activeBridge.SetUpstreamSocks(*upstreamSocks, *upstreamUser, *upstreamPass)
+			activeBridge.SetEgressRegistry(egressRegistry)
 			activeBridge.SetOnPeerConfig(func(fps, batch, trackCount int) {
 				sess.AdaptTrackCount(trackCount)
 			})
@@ -171,4 +174,23 @@ func main() {
 		serverURL = newServerURL
 		log.Printf("[rejoin] refreshed token for room=%s server=%s", roomID, serverURL)
 	}
+}
+
+func loadEgressRegistry(configPath, upstreamSocks, upstreamUser, upstreamPass string) *egress.Registry {
+	if configPath != "" && (upstreamSocks != "" || upstreamUser != "" || upstreamPass != "") {
+		log.Fatalf("[config] --egress-config cannot be combined with --upstream-*")
+	}
+	if configPath != "" {
+		reg, err := egress.LoadConfig(configPath)
+		if err != nil {
+			log.Fatalf("[config] egress config: %v", err)
+		}
+		log.Printf("[config] loaded egress config from %s", configPath)
+		return reg
+	}
+	reg, err := egress.LegacySOCKSRegistry(upstreamSocks, upstreamUser, upstreamPass)
+	if err != nil {
+		log.Fatalf("[config] legacy upstream: %v", err)
+	}
+	return reg
 }

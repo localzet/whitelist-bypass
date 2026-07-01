@@ -122,6 +122,31 @@
             android:textColorHint="@color/ink_3"
             android:textSize="12sp" />
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="6dp"
+            android:fontFamily="monospace"
+            android:letterSpacing="0.16"
+            android:text="@string/sheet_field_egress"
+            android:textAllCaps="true"
+            android:textColor="@color/ink_3"
+            android:textSize="10sp" />
+
+        <EditText
+            android:id="@+id/inputEgressId"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_input"
+            android:fontFamily="monospace"
+            android:hint="@string/sheet_field_egress_hint"
+            android:inputType="text"
+            android:padding="12dp"
+            android:textColor="@color/ink"
+            android:textColorHint="@color/ink_3"
+            android:textSize="12sp" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

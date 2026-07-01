@@ -15,6 +15,7 @@ export interface JoinerSettings {
   socksPort: number;
   socksUser: string;
   socksPass: string;
+  egressId: string;
   tunnelMode: 'video' | 'dc';
   vp8Fps: number;
   vp8Batch: number;

@@ -8,6 +8,7 @@ data class CallConfig(
     val id: String,
     val name: String,
     val url: String,
+    val egressId: String? = null,
     val tunnelMode: TunnelMode? = null,
     val vp8Fps: Int? = null,
     val vp8Batch: Int? = null,
@@ -33,6 +34,7 @@ data class CallConfig(
         put("id", id)
         put("name", name)
         put("url", url)
+        egressId?.takeIf { it.isNotBlank() }?.let { put("egressId", it) }
         tunnelMode?.let { put("tunnelMode", it.name) }
         vp8Fps?.let { put("vp8Fps", it) }
         vp8Batch?.let { put("vp8Batch", it) }
@@ -47,6 +49,7 @@ data class CallConfig(
             id = obj.getString("id"),
             name = obj.getString("name"),
             url = obj.getString("url"),
+            egressId = obj.optString("egressId").takeIf { it.isNotBlank() },
             tunnelMode = if (obj.has("tunnelMode")) try { TunnelMode.valueOf(obj.getString("tunnelMode")) } catch(e: Exception) { null } else null,
             vp8Fps = if (obj.has("vp8Fps")) obj.getInt("vp8Fps") else null,
             vp8Batch = if (obj.has("vp8Batch")) obj.getInt("vp8Batch") else null,

@@ -1,6 +1,9 @@
 package tunnel
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"encoding/json"
+)
 
 const (
 	MsgConnect    byte = 0x01
@@ -12,9 +15,14 @@ const (
 	MsgUDPReply   byte = 0x07
 	MsgConfig     byte = 0x08
 	MsgConfigAck  byte = 0x09
+	MsgClientHello byte = 0x0A
+	MsgServerHello byte = 0x0B
+	MsgControlErr  byte = 0x0C
 )
 
 const ControlConnID uint32 = 0
+const ControlProtocolVersion = 1
+const MaxControlPayload = 4096
 
 type DataTunnel interface {
 	SendData(data []byte)
@@ -23,6 +31,92 @@ type DataTunnel interface {
 	Reconfigure(fps, batch int)
 }
 
+type ClientHello struct {
+	ProtocolVersion  int      `json:"protocolVersion"`
+	Capabilities     []string `json:"capabilities,omitempty"`
+	RequestedEgressID string   `json:"requestedEgressId,omitempty"`
+}
+
+type ServerHello struct {
+	ProtocolVersion int      `json:"protocolVersion"`
+	Capabilities    []string `json:"capabilities,omitempty"`
+	SelectedEgressID string   `json:"selectedEgressId"`
+}
+
+type ControlError struct {
+	Code        string `json:"code"`
+	SafeMessage string `json:"safeMessage"`
+}
+
+func EncodeClientHello(requestedEgressID string) []byte {
+	return EncodeFrame(ControlConnID, MsgClientHello, EncodeClientHelloPayload(requestedEgressID))
+}
+
+func EncodeClientHelloPayload(requestedEgressID string) []byte {
+	return encodeControlJSON(ClientHello{
+		ProtocolVersion:  ControlProtocolVersion,
+		Capabilities:     []string{"egress-select"},
+		RequestedEgressID: requestedEgressID,
+	})
+}
+
+func EncodeServerHello(selectedEgressID string) []byte {
+	return EncodeFrame(ControlConnID, MsgServerHello, EncodeServerHelloPayload(selectedEgressID))
+}
+
+func EncodeServerHelloPayload(selectedEgressID string) []byte {
+	return encodeControlJSON(ServerHello{
+		ProtocolVersion: ControlProtocolVersion,
+		Capabilities:    []string{"egress-select"},
+		SelectedEgressID: selectedEgressID,
+	})
+}
+
+func EncodeControlError(code, safeMessage string) []byte {
+	return EncodeFrame(ControlConnID, MsgControlErr, EncodeControlErrorPayload(code, safeMessage))
+}
+
+func EncodeControlErrorPayload(code, safeMessage string) []byte {
+	return encodeControlJSON(ControlError{Code: code, SafeMessage: safeMessage})
+}
+
+func DecodeClientHello(payload []byte) (ClientHello, bool) {
+	var msg ClientHello
+	if len(payload) == 0 || len(payload) > MaxControlPayload {
+		return msg, false
+	}
+	if err := json.Unmarshal(payload, &msg); err != nil {
+		return msg, false
+	}
+	return msg, msg.ProtocolVersion == ControlProtocolVersion
+}
+
+func DecodeServerHello(payload []byte) (ServerHello, bool) {
+	var msg ServerHello
+	if len(payload) == 0 || len(payload) > MaxControlPayload {
+		return msg, false
+	}
+	if err := json.Unmarshal(payload, &msg); err != nil {
+		return msg, false
+	}
+	return msg, msg.ProtocolVersion == ControlProtocolVersion
+}
+
+func DecodeControlError(payload []byte) (ControlError, bool) {
+	var msg ControlError
+	if len(payload) == 0 || len(payload) > MaxControlPayload {
+		return msg, false
+	}
+	if err := json.Unmarshal(payload, &msg); err != nil {
+		return msg, false
+	}
+	return msg, msg.Code != ""
+}
+
+func encodeControlJSON(value any) []byte {
+	payload, _ := json.Marshal(value)
+	return payload
+}
 func EncodeVP8Config(fps, batch, trackCount int) []byte {
 	if fps < 1 {
 		fps = 1

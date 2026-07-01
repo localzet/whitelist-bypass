@@ -153,6 +153,9 @@ object Prefs {
     val activeDualTrack: Boolean
         get() = activeDestination?.dualTrack ?: dualTrack
 
+    val activeEgressId: String
+        get() = activeDestination?.egressId.orEmpty()
+
     fun updateDestination(config: CallConfig) {
         val list = savedDestinations.toMutableList()
         val index = list.indexOfFirst { it.id == config.id }

@@ -73,6 +73,7 @@ type bot struct {
 	upstreamSocks string
 	upstreamUser  string
 	upstreamPass  string
+	egressConfig  string
 
 	server, key, ts string
 
@@ -361,7 +362,9 @@ func (b *bot) spawn(platform, joinTarget string) (*session, error) {
 	if joinTarget != "" {
 		args = append(args, joinFlag, joinTarget)
 	}
-	if b.upstreamSocks != "" {
+	if b.egressConfig != "" {
+		args = append(args, "--egress-config", b.egressConfig)
+	} else if b.upstreamSocks != "" {
 		args = append(args, "--upstream-socks", b.upstreamSocks)
 		if b.upstreamUser != "" {
 			args = append(args, "--upstream-user", b.upstreamUser)
@@ -495,8 +498,12 @@ func main() {
 	upstreamSocks := flag.String("upstream-socks", "", "forward to spawned creators: route tunneled egress through this SOCKS5 proxy (host:port), e.g. a local VPN client")
 	upstreamUser := flag.String("upstream-user", "", "upstream SOCKS5 username forwarded to spawned creators")
 	upstreamPass := flag.String("upstream-pass", "", "upstream SOCKS5 password forwarded to spawned creators")
+	egressConfig := flag.String("egress-config", "", "forward to spawned creators: JSON egress profile config")
 	flag.Parse()
 
+	if *egressConfig != "" && (*upstreamSocks != "" || *upstreamUser != "" || *upstreamPass != "") {
+		log.Fatal("--egress-config cannot be combined with --upstream-*")
+	}
 	switch *resources {
 	case "default", "moderate", "unlimited":
 	default:
@@ -529,6 +536,7 @@ func main() {
 		upstreamSocks: *upstreamSocks,
 		upstreamUser:  *upstreamUser,
 		upstreamPass:  *upstreamPass,
+		egressConfig:  *egressConfig,
 		sessions:      map[string]*session{},
 		awaitingJoin:  map[int64]bool{},
 	}

@@ -139,6 +139,7 @@ class MainFragment : Fragment(R.layout.fragment_main_screen) {
             title = config.name,
             subtitle = config.url,
             items = listOf(
+                MenuActionSheet.MenuItem("egress", getString(R.string.sheet_field_egress), R.drawable.ic_setting_proxy, value = config.egressId ?: "default"),
                 MenuActionSheet.MenuItem("tunnel", getString(R.string.settings_row_tunnel_mode), R.drawable.ic_setting_tunnel, value = tunnelMode.label),
                 MenuActionSheet.MenuItem("vp8", getString(R.string.settings_row_vp8), R.drawable.ic_setting_vp8, value = getString(vp8SubRes, vp8Fps, vp8Batch)),
                 MenuActionSheet.MenuItem("rename", getString(R.string.destination_menu_rename), R.drawable.ic_action_pencil),
@@ -146,11 +147,26 @@ class MainFragment : Fragment(R.layout.fragment_main_screen) {
             ),
         ) { item ->
             when (item.id) {
+                "egress" -> promptEgress(config)
                 "tunnel" -> editTunnelMode(config)
                 "vp8" -> editVp8(config)
                 "rename" -> promptRename(config)
                 "delete" -> confirmDelete(config)
             }
+        }
+    }
+
+    private fun promptEgress(config: CallConfig) {
+        InputActionSheet.show(
+            manager = parentFragmentManager,
+            title = getString(R.string.sheet_field_egress),
+            fieldLabel = getString(R.string.sheet_field_egress),
+            initialValue = config.egressId.orEmpty(),
+            hint = getString(R.string.sheet_field_egress_hint),
+            allowEmpty = true,
+        ) { value ->
+            Prefs.updateDestination(config.copy(egressId = value.trim().ifEmpty { null }))
+            onDestinationsChanged()
         }
     }
 

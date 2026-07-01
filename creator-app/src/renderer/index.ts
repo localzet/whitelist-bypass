@@ -88,6 +88,7 @@ function bindSettingsEvents(): void {
     tm.upstreamProxy.socks = (document.getElementById('upstreamSocks') as HTMLInputElement).value.trim();
     tm.upstreamProxy.user = (document.getElementById('upstreamUser') as HTMLInputElement).value.trim();
     tm.upstreamProxy.pass = (document.getElementById('upstreamPass') as HTMLInputElement).value.trim();
+    tm.upstreamProxy.egressConfig = (document.getElementById('egressConfig') as HTMLInputElement).value.trim();
     tm.saveUpstreamProxy();
     closeSettings();
   });
@@ -174,6 +175,7 @@ function openSettings(): void {
   (document.getElementById('upstreamSocks') as HTMLInputElement).value = tm.upstreamProxy.socks;
   (document.getElementById('upstreamUser') as HTMLInputElement).value = tm.upstreamProxy.user;
   (document.getElementById('upstreamPass') as HTMLInputElement).value = tm.upstreamProxy.pass;
+  (document.getElementById('egressConfig') as HTMLInputElement).value = tm.upstreamProxy.egressConfig;
   document.getElementById('clearCookiesStatus')!.textContent = '';
 }
 

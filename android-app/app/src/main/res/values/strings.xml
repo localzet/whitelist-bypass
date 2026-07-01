@@ -87,8 +87,10 @@
     <string name="sheet_new_sub">Save a call link to your list. Platform is detected automatically.</string>
     <string name="sheet_field_name">Name</string>
     <string name="sheet_field_link">Call link</string>
+    <string name="sheet_field_egress">Egress ID</string>
     <string name="sheet_field_name_hint">e.g. Standup VK</string>
     <string name="sheet_field_link_hint">https://&#8230;</string>
+    <string name="sheet_field_egress_hint">default / de-fra-1 / nl-ams-1</string>
     <string name="sheet_save">Save call</string>
     <string name="sheet_save_short">Save</string>
     <string name="sheet_cancel">Cancel</string>

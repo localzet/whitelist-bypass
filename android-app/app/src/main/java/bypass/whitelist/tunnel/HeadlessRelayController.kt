@@ -55,7 +55,7 @@ class HeadlessRelayController(
                 return@Thread
             }
             try {
-                val processBuilder = ProcessBuilder(
+                val args = mutableListOf(
                     relayBin.absolutePath,
                     "--mode", relayMode,
                     "--ws-port", "${Ports.PION_SIGNALING}",
@@ -64,6 +64,10 @@ class HeadlessRelayController(
                     "--socks-user", SocksAuth.user,
                     "--socks-pass", SocksAuth.pass
                 )
+                Prefs.activeEgressId.takeIf { it.isNotBlank() }?.let {
+                    args += listOf("--egress-id", it)
+                }
+                val processBuilder = ProcessBuilder(args)
                 processBuilder.redirectErrorStream(true)
                 val proc = processBuilder.start()
                 synchronized(this) {

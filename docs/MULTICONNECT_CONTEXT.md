@@ -2,6 +2,8 @@
 
 Актуально на 2026-07-01 для `main` / `6571875` (`add arm32 and mips architectures into cli script`).
 
+Дополнение после итерации `feat: add multiconnect egress selection`: начата реализация multiconnect в коде. Добавлены `relay/egress`, versioned control handshake, `--egress-config` на creator и `--egress-id` на joiner. Android получил `egressId` в сохранённых звонках и UI редактирования. Windows/Linux desktop joiner получил поле `Egress ID` и восстановление последней формы. Пример серверного конфига лежит в `docs/egresses.example.json`.
+
 ## 1. Цель
 
 Целевая схема:
@@ -57,7 +59,7 @@ Internet
 
 ### Чего не хватает
 
-- В `CallConfig` Android нет `egressId`.
+- До текущей итерации в `CallConfig` Android не было `egressId`; сейчас поле добавлено и старый JSON остаётся совместимым.
 - Desktop joiner не сохраняет список назначений: ссылка и настройки живут только в текущей форме.
 - Headless Linux CLI не имеет общего хранилища профилей и единого launcher-а для всех платформ.
 - `RelayBridge` содержит один `*Socks5Upstream`; выбора по идентификатору нет.

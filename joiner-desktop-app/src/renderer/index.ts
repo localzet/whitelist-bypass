@@ -39,6 +39,28 @@ const stopBtn = $('stop') as HTMLButtonElement;
 const downloadLogsBtn = $('downloadLogs') as HTMLImageElement;
 const platformHint = $('platformHint');
 const linkInput = input('link');
+const savedSettingsRaw = localStorage.getItem('joiner:lastSettings');
+
+if (savedSettingsRaw) {
+  try {
+    const saved = JSON.parse(savedSettingsRaw);
+    input('link').value = saved.link ?? '';
+    input('name').value = saved.displayName ?? 'Joiner';
+    input('egressId').value = saved.egressId ?? '';
+    input('socksPort').value = String(saved.socksPort ?? 1080);
+    input('socksUser').value = saved.socksUser ?? '';
+    input('socksPass').value = saved.socksPass ?? '';
+    select('tunnelMode').value = saved.tunnelMode ?? 'video';
+    input('vp8Fps').value = String(saved.vp8Fps ?? 24);
+    input('vp8Batch').value = String(saved.vp8Batch ?? 30);
+    select('resources').value = saved.resources ?? 'default';
+    input('dns').value = saved.dns ?? '1.1.1.1,8.8.8.8';
+    input('noTun').checked = Boolean(saved.noTun);
+    input('dualTrack').checked = Boolean(saved.dualTrack);
+  } catch {
+    localStorage.removeItem('joiner:lastSettings');
+  }
+}
 
 stopBtn.disabled = true;
 
@@ -93,6 +115,7 @@ startBtn.addEventListener('click', async () => {
     socksPort: parseInt(input('socksPort').value, 10) || 1080,
     socksUser: input('socksUser').value,
     socksPass: input('socksPass').value,
+    egressId: input('egressId').value.trim(),
     tunnelMode: select('tunnelMode').value,
     vp8Fps: parseInt(input('vp8Fps').value, 10) || 24,
     vp8Batch: parseInt(input('vp8Batch').value, 10) || 30,
@@ -101,6 +124,7 @@ startBtn.addEventListener('click', async () => {
     noTun: input('noTun').checked,
     dualTrack: input('dualTrack').checked,
   };
+  localStorage.setItem('joiner:lastSettings', JSON.stringify(settings));
   const r = await bridge.start(settings);
   if (!r.ok) appendLog(`[ui] start failed: ${r.error}\n`);
 });

@@ -13,43 +13,29 @@ import (
 	"time"
 
 	"whitelist-bypass/relay/common"
+	"whitelist-bypass/relay/egress"
 )
 
 const verboseUDPLogging = false
 
 type creatorUDP struct {
-	direct *net.UDPConn
-	socks  *common.Socks5UDPSession
+	session egress.UDPSession
 }
 
 func (c *creatorUDP) writePacket(data []byte, dst string) error {
-	if c.socks != nil {
-		return c.socks.WriteTo(data, dst)
-	}
-	c.direct.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	_, err := c.direct.Write(data)
-	return err
+	return c.session.WriteTo(data, dst)
 }
 
 func (c *creatorUDP) read(buf []byte) (int, error) {
-	if c.socks != nil {
-		return c.socks.Read(buf)
-	}
-	return c.direct.Read(buf)
+	return c.session.Read(buf)
 }
 
 func (c *creatorUDP) setReadDeadline(t time.Time) error {
-	if c.socks != nil {
-		return c.socks.SetReadDeadline(t)
-	}
-	return c.direct.SetReadDeadline(t)
+	return c.session.SetReadDeadline(t)
 }
 
 func (c *creatorUDP) close() error {
-	if c.socks != nil {
-		return c.socks.Close()
-	}
-	return c.direct.Close()
+	return c.session.Close()
 }
 
 type udpClient struct {
@@ -74,7 +60,14 @@ type RelayBridge struct {
 	once        sync.Once
 	socksUser   string
 	socksPass   string
-	upstream    *common.Socks5Upstream
+	egressMu    sync.RWMutex
+	egressReg   *egress.Registry
+	dialer      egress.Dialer
+	egressID    string
+	requestedEgressID string
+	handshakeDone chan struct{}
+	handshakeOnce sync.Once
+	handshakeErr  atomic.Value
 
 	persistentListener atomic.Bool
 	listenerMu         sync.Mutex
@@ -109,11 +102,16 @@ func NewRelayBridgeWithAuth(tunnel DataTunnel, mode string, readBuf int, logFn f
 
 func NewRelayBridge(tunnel DataTunnel, mode string, readBuf int, logFn func(string, ...any)) *RelayBridge {
 	rb := &RelayBridge{
-		tunnel:  tunnel,
-		logFn:   logFn,
-		mode:    mode,
-		readBuf: readBuf,
-		ready:   make(chan struct{}),
+		tunnel:        tunnel,
+		logFn:         logFn,
+		mode:          mode,
+		readBuf:       readBuf,
+		ready:         make(chan struct{}),
+		egressReg:     egress.DirectRegistry(),
+		handshakeDone: make(chan struct{}),
+	}
+	if mode == "creator" {
+		rb.selectCreatorEgress("")
 	}
 	tunnel.SetOnData(rb.handleTunnelData)
 	tunnel.SetOnClose(rb.handleTunnelClose)
@@ -125,7 +123,33 @@ func (rb *RelayBridge) SetPersistentListener(persistent bool) {
 }
 
 func (rb *RelayBridge) SetUpstreamSocks(addr, user, pass string) {
-	rb.upstream = common.NewSocks5Upstream(addr, user, pass)
+	reg, err := egress.LegacySOCKSRegistry(addr, user, pass)
+	if err != nil {
+		rb.setHandshakeError(err)
+		rb.logFn("relay: invalid legacy upstream: %v", err)
+		return
+	}
+	rb.SetEgressRegistry(reg)
+}
+
+func (rb *RelayBridge) SetEgressRegistry(reg *egress.Registry) {
+	if reg == nil {
+		reg = egress.DirectRegistry()
+	}
+	rb.egressMu.Lock()
+	rb.egressReg = reg
+	rb.dialer = nil
+	rb.egressID = ""
+	rb.egressMu.Unlock()
+	if rb.mode == "creator" {
+		rb.selectCreatorEgress("")
+	}
+}
+
+func (rb *RelayBridge) SetRequestedEgressID(id string) {
+	rb.egressMu.Lock()
+	rb.requestedEgressID = strings.TrimSpace(id)
+	rb.egressMu.Unlock()
 }
 
 func (rb *RelayBridge) SwapTunnel(newTunnel DataTunnel) {
@@ -135,6 +159,9 @@ func (rb *RelayBridge) SwapTunnel(newTunnel DataTunnel) {
 	newTunnel.SetOnData(rb.handleTunnelData)
 	newTunnel.SetOnClose(rb.handleTunnelClose)
 	rb.closeAll()
+	if rb.mode == "joiner" {
+		rb.sendClientHello()
+	}
 }
 
 func (rb *RelayBridge) currentTunnel() DataTunnel {
@@ -215,9 +242,82 @@ func (rb *RelayBridge) Stats() (tcpConns, udpConns int, nextID uint32) {
 }
 
 func (rb *RelayBridge) MarkReady() {
+	if rb.mode == "joiner" {
+		rb.sendClientHello()
+	}
 	rb.once.Do(func() { close(rb.ready) })
 }
 
+func (rb *RelayBridge) sendClientHello() {
+	requested := rb.requestedEgress()
+	rb.send(ControlConnID, MsgClientHello, EncodeClientHelloPayload(requested))
+	if requested != "" {
+		rb.logFn("relay: requested egress %q", requested)
+	}
+}
+
+func (rb *RelayBridge) requestedEgress() string {
+	rb.egressMu.RLock()
+	defer rb.egressMu.RUnlock()
+	return rb.requestedEgressID
+}
+
+func (rb *RelayBridge) selectedDialer() (egress.Dialer, string, error) {
+	rb.egressMu.RLock()
+	dialer := rb.dialer
+	id := rb.egressID
+	rb.egressMu.RUnlock()
+	if dialer == nil {
+		return nil, "", fmt.Errorf("egress is not selected")
+	}
+	return dialer, id, nil
+}
+
+func (rb *RelayBridge) selectCreatorEgress(requestedID string) error {
+	rb.egressMu.RLock()
+	reg := rb.egressReg
+	rb.egressMu.RUnlock()
+	dialer, id, err := reg.Select(requestedID)
+	if err != nil {
+		rb.setHandshakeError(err)
+		return err
+	}
+	rb.egressMu.Lock()
+	rb.dialer = dialer
+	rb.egressID = id
+	rb.egressMu.Unlock()
+	rb.markHandshakeDone()
+	rb.logFn("relay: selected egress %q", id)
+	return nil
+}
+
+func (rb *RelayBridge) markHandshakeDone() {
+	rb.handshakeOnce.Do(func() { close(rb.handshakeDone) })
+}
+
+func (rb *RelayBridge) setHandshakeError(err error) {
+	if err != nil {
+		rb.handshakeErr.Store(err.Error())
+	}
+	rb.markHandshakeDone()
+}
+
+func (rb *RelayBridge) waitRequestedEgress(timeout time.Duration) error {
+	if rb.mode != "joiner" || rb.requestedEgress() == "" {
+		return nil
+	}
+	select {
+	case <-rb.handshakeDone:
+		if errVal := rb.handshakeErr.Load(); errVal != nil {
+			if msg, ok := errVal.(string); ok {
+				return fmt.Errorf("%s", msg)
+			}
+		}
+		return nil
+	case <-time.After(timeout):
+		return fmt.Errorf("egress selection timed out")
+	}
+}
 func (rb *RelayBridge) send(connID uint32, msgType byte, payload []byte) {
 	frame := EncodeFrame(connID, msgType, payload)
 	rb.currentTunnel().SendData(frame)
@@ -251,6 +351,50 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 				if cb != nil {
 					cb()
 				}
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgClientHello {
+			if rb.mode == "creator" {
+				hello, ok := DecodeClientHello(payload)
+				if !ok {
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("bad_client_hello", "invalid egress handshake"))
+					return
+				}
+				if err := rb.selectCreatorEgress(hello.RequestedEgressID); err != nil {
+					rb.logFn("relay: egress selection failed: %v", err)
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("egress_unavailable", err.Error()))
+					return
+				}
+				_, id, _ := rb.selectedDialer()
+				rb.send(ControlConnID, MsgServerHello, EncodeServerHelloPayload(id))
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgServerHello {
+			if rb.mode == "joiner" {
+				hello, ok := DecodeServerHello(payload)
+				if !ok {
+					rb.setHandshakeError(fmt.Errorf("invalid server egress handshake"))
+					return
+				}
+				rb.egressMu.Lock()
+				rb.egressID = hello.SelectedEgressID
+				rb.egressMu.Unlock()
+				rb.logFn("relay: server selected egress %q", hello.SelectedEgressID)
+				rb.markHandshakeDone()
+			}
+			return
+		}
+		if connID == ControlConnID && msgType == MsgControlErr {
+			if rb.mode == "joiner" {
+				ctrlErr, ok := DecodeControlError(payload)
+				if !ok {
+					rb.setHandshakeError(fmt.Errorf("creator rejected egress selection"))
+					return
+				}
+				rb.setHandshakeError(fmt.Errorf("%s: %s", ctrlErr.Code, ctrlErr.SafeMessage))
+				rb.logFn("relay: control error %s: %s", ctrlErr.Code, ctrlErr.SafeMessage)
 			}
 			return
 		}
@@ -438,44 +582,31 @@ func (rb *RelayBridge) handleUDP(connID uint32, payload []byte) {
 }
 
 func (rb *RelayBridge) dialCreatorUDP(addr string) (*creatorUDP, error) {
-	if rb.upstream != nil {
-		sess, err := rb.upstream.UDPAssociate(10 * time.Second)
-		if err != nil {
-			return nil, err
-		}
-		return &creatorUDP{socks: sess}, nil
-	}
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+	dialer, _, err := rb.selectedDialer()
 	if err != nil {
 		return nil, err
 	}
-	dialed, err := net.DialUDP("udp", nil, udpAddr)
+	sess, err := dialer.UDPAssociate(addr, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
-	return &creatorUDP{direct: dialed}, nil
+	return &creatorUDP{session: sess}, nil
 }
 
 func (rb *RelayBridge) connectTCP(connID uint32, addr string) {
 	rb.logFn("relay: CONNECT %d -> %s", connID, common.MaskAddr(addr))
-	var conn net.Conn
-	var err error
-	if rb.upstream != nil {
-		conn, err = rb.upstream.DialTCP(addr, 10*time.Second)
-	} else {
-		if host, port, splitErr := net.SplitHostPort(addr); splitErr == nil && host != "" && net.ParseIP(host) == nil {
-			dnsStart := time.Now()
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			ips, dnsErr := net.DefaultResolver.LookupIPAddr(ctx, host)
-			cancel()
-			if dnsErr != nil {
-				rb.logFn("relay: DNS %d %s failed in %s: %v", connID, host, time.Since(dnsStart), dnsErr)
-			} else {
-				rb.logFn("relay: DNS %d %s -> %s port=%s took=%s", connID, host, ipAddrList(ips), port, time.Since(dnsStart))
-			}
-		}
-		conn, err = net.DialTimeout("tcp", addr, 10*time.Second)
+	dialer, egressID, err := rb.selectedDialer()
+	if err != nil {
+		rb.logFn("relay: CONNECT %d failed: %s", connID, common.MaskError(err))
+		rb.send(connID, MsgConnectErr, []byte(common.MaskError(err)))
+		return
 	}
+	if egressID == "direct" {
+		if host, port, splitErr := net.SplitHostPort(addr); splitErr == nil && host != "" && net.ParseIP(host) == nil {
+			rb.logDNS(connID, host, port)
+		}
+	}
+	conn, err := dialer.DialTCP(addr, 10*time.Second)
 	if err != nil {
 		rb.logFn("relay: CONNECT %d failed: %s", connID, common.MaskError(err))
 		rb.send(connID, MsgConnectErr, []byte(common.MaskError(err)))
@@ -511,6 +642,17 @@ func (rb *RelayBridge) connectTCP(connID uint32, addr string) {
 	rb.conns.Delete(connID)
 }
 
+func (rb *RelayBridge) logDNS(connID uint32, host, port string) {
+	dnsStart := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ips, dnsErr := net.DefaultResolver.LookupIPAddr(ctx, host)
+	cancel()
+	if dnsErr != nil {
+		rb.logFn("relay: DNS %d %s failed in %s: %v", connID, host, time.Since(dnsStart), dnsErr)
+		return
+	}
+	rb.logFn("relay: DNS %d %s -> %s port=%s took=%s", connID, host, ipAddrList(ips), port, time.Since(dnsStart))
+}
 type socksConn struct {
 	id   uint32
 	conn net.Conn
@@ -552,6 +694,11 @@ func (rb *RelayBridge) ListenSOCKS(addr string) error {
 func (rb *RelayBridge) handleSOCKS(conn net.Conn) {
 	<-rb.ready
 	if rb.closed.Load() {
+		conn.Close()
+		return
+	}
+	if err := rb.waitRequestedEgress(8 * time.Second); err != nil {
+		rb.logFn("relay: SOCKS rejected before egress selection: %v", err)
 		conn.Close()
 		return
 	}

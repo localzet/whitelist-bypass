@@ -52,7 +52,7 @@ export class TabManager {
   private headlessWBStreamPath: string;
   private headlessDionPath: string;
   private hooksDir: string;
-  private upstreamProxy: UpstreamProxy = { socks: '', user: '', pass: '' };
+  private upstreamProxy: UpstreamProxy = { socks: '', user: '', pass: '', egressConfig: '' };
 
   constructor() {
     this.relayPath = resolveResourcePath(
@@ -220,10 +220,15 @@ export class TabManager {
       socks: (proxy?.socks || '').trim(),
       user: (proxy?.user || '').trim(),
       pass: (proxy?.pass || '').trim(),
+      egressConfig: (proxy?.egressConfig || '').trim(),
     };
   }
 
   private appendUpstreamArgs(args: string[]): void {
+    if (this.upstreamProxy.egressConfig) {
+      args.push('--egress-config', this.upstreamProxy.egressConfig);
+      return;
+    }
     if (!this.upstreamProxy.socks) return;
     args.push('--upstream-socks', this.upstreamProxy.socks);
     if (this.upstreamProxy.user) args.push('--upstream-user', this.upstreamProxy.user);

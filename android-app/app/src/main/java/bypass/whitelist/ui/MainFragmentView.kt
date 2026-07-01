@@ -255,7 +255,7 @@ class MainFragmentView(private val root: View) {
         val statusDot = row.findViewById<View>(R.id.rowStatusDot)
 
         nameView.text = config.name
-        linkView.text = config.url
+        linkView.text = config.egressId?.takeIf { it.isNotBlank() }?.let { "${config.url} · $it" } ?: config.url
         glyphView.text = config.platformGlyph
 
         if (isActive) {

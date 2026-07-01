@@ -18,6 +18,8 @@ class InputActionSheet : BottomSheetDialogFragment() {
     private var subtitleText: String? = null
     private var fieldLabel: String = ""
     private var initialValue: String = ""
+    private var hintText: String? = null
+    private var allowEmpty: Boolean = false
     private var onSave: ParamCallback<String>? = null
 
     override fun onCreateView(
@@ -42,13 +44,14 @@ class InputActionSheet : BottomSheetDialogFragment() {
             subView.visibility = View.VISIBLE
         }
         labelView.text = fieldLabel
+        input.hint = hintText
         input.setText(initialValue)
         input.setSelection(input.text.length)
 
         cancel.setOnClickListener { dismiss() }
         save.setOnClickListener {
             val value = input.text.toString().trim()
-            if (value.isNotEmpty()) {
+            if (value.isNotEmpty() || allowEmpty) {
                 onSave?.invoke(value)
                 dismiss()
             } else {
@@ -64,6 +67,8 @@ class InputActionSheet : BottomSheetDialogFragment() {
             subtitle: String? = null,
             fieldLabel: String,
             initialValue: String,
+            hint: String? = null,
+            allowEmpty: Boolean = false,
             onSave: ParamCallback<String>,
         ) {
             InputActionSheet().apply {
@@ -71,6 +76,8 @@ class InputActionSheet : BottomSheetDialogFragment() {
                 this.subtitleText = subtitle
                 this.fieldLabel = fieldLabel
                 this.initialValue = initialValue
+                this.hintText = hint
+                this.allowEmpty = allowEmpty
                 this.onSave = onSave
             }.show(manager, "InputActionSheet")
         }

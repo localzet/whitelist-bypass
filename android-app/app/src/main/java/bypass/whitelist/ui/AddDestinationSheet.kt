@@ -28,6 +28,7 @@ class AddDestinationSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val inputName = view.findViewById<EditText>(R.id.inputName)
         val inputLink = view.findViewById<EditText>(R.id.inputLink)
+        val inputEgressId = view.findViewById<EditText>(R.id.inputEgressId)
         val pasteChip = view.findViewById<LinearLayout>(R.id.pasteChip)
         val pasteChipLabel = view.findViewById<TextView>(R.id.pasteChipLabel)
         val buttonCancel = view.findViewById<Button>(R.id.buttonCancel)
@@ -57,7 +58,8 @@ class AddDestinationSheet : BottomSheetDialogFragment() {
                 return@setOnClickListener
             }
             val name = inputName.text.toString().trim().ifEmpty { CallConfig.suggestNameFor(link) }
-            val config = CallConfig.newWith(name = name, url = link)
+            val egressId = inputEgressId.text.toString().trim().ifEmpty { null }
+            val config = CallConfig.newWith(name = name, url = link).copy(egressId = egressId)
             Prefs.addDestination(config)
             (parentFragment as? CallsListener)?.onDestinationsChanged()
             (activity as? CallsListener)?.onDestinationsChanged()

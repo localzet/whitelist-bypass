@@ -101,6 +101,7 @@ func main() {
 	socksPort := flag.Int("socks-port", 1080, "local SOCKS5 port")
 	socksUser := flag.String("socks-user", "", "optional SOCKS5 username")
 	socksPass := flag.String("socks-pass", "", "optional SOCKS5 password")
+	egressID := flag.String("egress-id", "", "creator egress profile id")
 	resources := flag.String("resources", "default", "moderate | default | unlimited")
 	tunnelMode := flag.String("tunnel-mode", "video", "tunnel mode for WB Stream: video | dc")
 	vp8FPS := flag.Int("vp8-fps", 24, "VP8 frame rate")
@@ -256,6 +257,7 @@ func main() {
 			return
 		}
 		bridge = tunnel.NewRelayBridgeWithAuth(t, "joiner", readBuf, log.Printf, *socksUser, *socksPass)
+		bridge.SetRequestedEgressID(*egressID)
 		bridge.SetPersistentListener(true)
 		bridge.MarkReady()
 		addr := fmt.Sprintf("%s:%d", *socksHost, *socksPort)

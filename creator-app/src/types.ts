@@ -69,6 +69,7 @@ export interface UpstreamProxy {
   socks: string;
   user: string;
   pass: string;
+  egressConfig: string;
 }
 
 export interface TabConfig {

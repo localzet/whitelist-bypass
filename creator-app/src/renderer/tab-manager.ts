@@ -30,8 +30,8 @@ export class RendererTabManager {
       : { token: '', groupId: '', userId: '' };
     const savedProxy = localStorage.getItem('upstreamProxy');
     this.upstreamProxy = savedProxy
-      ? JSON.parse(savedProxy)
-      : { socks: '', user: '', pass: '' };
+      ? { socks: '', user: '', pass: '', egressConfig: '', ...JSON.parse(savedProxy) }
+      : { socks: '', user: '', pass: '', egressConfig: '' };
   }
 
   createTab(): string {

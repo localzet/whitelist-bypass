@@ -23,6 +23,7 @@ func main() {
 	socksPort := flag.Int("socks-port", 1080, "SOCKS5 listen port")
 	socksUser := flag.String("socks-user", "", "SOCKS5 username (optional)")
 	socksPass := flag.String("socks-pass", "", "SOCKS5 password (optional)")
+	egressID := flag.String("egress-id", "", "creator egress profile id")
 	resources := flag.String("resources", "default", "resource mode: moderate, default, unlimited")
 	flag.Parse()
 
@@ -77,6 +78,7 @@ func main() {
 				activeBridge.Reset()
 			}
 			activeBridge = tunnel.NewRelayBridgeWithAuth(tun, "joiner", common.VP8BufSize, log.Printf, *socksUser, *socksPass)
+			activeBridge.SetRequestedEgressID(*egressID)
 			activeBridge.MarkReady()
 			addr := fmt.Sprintf("%s:%d", *socksHost, *socksPort)
 			go func() {

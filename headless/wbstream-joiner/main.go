@@ -22,6 +22,7 @@ func main() {
 	socksPort := flag.Int("socks-port", 1080, "SOCKS5 listen port")
 	socksUser := flag.String("socks-user", "", "SOCKS5 username (optional)")
 	socksPass := flag.String("socks-pass", "", "SOCKS5 password (optional)")
+	egressID := flag.String("egress-id", "", "creator egress profile id")
 	resources := flag.String("resources", "default", "resource mode: moderate, default, unlimited")
 	tunnelMode := flag.String("tunnel-mode", "video", "tunnel mode: video, dc")
 	vp8FPS := flag.Int("vp8-fps", 24, "VP8 frame rate (video mode only)")
@@ -79,6 +80,7 @@ func main() {
 			readBuf = common.DCBufSize
 		}
 		bridge := tunnel.NewRelayBridgeWithAuth(tun, "joiner", readBuf, log.Printf, *socksUser, *socksPass)
+		bridge.SetRequestedEgressID(*egressID)
 		bridge.SetOnConfigAck(sess.MarkConfigAcked)
 		bridge.MarkReady()
 		addr := fmt.Sprintf("%s:%d", *socksHost, *socksPort)

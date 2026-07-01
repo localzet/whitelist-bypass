@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "defaultEgress": "direct",
+  "egresses": [
+    {
+      "id": "direct",
+      "type": "direct",
+      "enabled": true
+    },
+    {
+      "id": "de-fra-1",
+      "type": "socks5",
+      "address": "10.20.0.11:1080",
+      "username": "whitelist-bypass",
+      "passwordEnv": "WB_EGRESS_DE_FRA_1_PASSWORD",
+      "enabled": true
+    },
+    {
+      "id": "nl-ams-1",
+      "type": "socks5",
+      "address": "10.20.0.12:1080",
+      "username": "whitelist-bypass",
+      "passwordEnv": "WB_EGRESS_NL_AMS_1_PASSWORD",
+      "enabled": true
+    }
+  ]
+}
