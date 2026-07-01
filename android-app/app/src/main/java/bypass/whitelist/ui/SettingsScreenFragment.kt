@@ -15,6 +15,7 @@ import bypass.whitelist.tunnel.CallPlatform
 import bypass.whitelist.tunnel.ServiceCookieStore
 import bypass.whitelist.tunnel.TunnelMode
 import bypass.whitelist.util.Callback
+import bypass.whitelist.util.AccentMode
 import bypass.whitelist.util.ParamCallback
 import bypass.whitelist.util.Prefs
 import bypass.whitelist.util.ThemeMode
@@ -68,6 +69,17 @@ class SettingsScreenFragment : Fragment(R.layout.fragment_settings_screen) {
                 }
             }
         }
+        addRow(card, R.drawable.ic_setting_theme, getString(R.string.settings_row_accent), null, Prefs.accentMode.label) {
+            ChoiceActionSheet.show(
+                manager = parentFragmentManager,
+                title = getString(R.string.settings_row_accent),
+                options = AccentMode.entries.map { ChoiceActionSheet.Option(it.name, it.label) },
+                selectedId = Prefs.accentMode.name,
+            ) { picked ->
+                Prefs.accentMode = AccentMode.valueOf(picked.id)
+                requireActivity().recreate()
+            }
+        }
         return section
     }
 
@@ -104,7 +116,6 @@ class SettingsScreenFragment : Fragment(R.layout.fragment_settings_screen) {
         addRow(card, R.drawable.ic_setting_autofill, getString(R.string.settings_row_autofill), if (Prefs.autofillEnabled) Prefs.autofillName else getString(R.string.settings_row_autofill_off), null) {
             AutofillActionSheet.show(parentFragmentManager) { rebuild() }
         }
-
         val accountStatus = if (ServiceCookieStore.hasCookies(requireContext(), Prefs.serviceUserId, CallPlatform.TELEMOST)) {
             getString(R.string.yandex_account_ready)
         } else {

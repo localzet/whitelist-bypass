@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="accent_emerald">#FF7B1C2A</color>
-    <color name="accent_emerald_soft">#1F7B1C2A</color>
+    <color name="accent_emerald">#FF0EA58F</color>
+    <color name="accent_emerald_soft">#260EA58F</color>
+    <color name="accent_violet">#FF7C5CE0</color>
+    <color name="accent_violet_soft">#267C5CE0</color>
     <color name="warn_amber">#FFB07A1D</color>
     <color name="error_red">#FFD32F2F</color>
     <color name="ink">#FF0D0D0C</color>

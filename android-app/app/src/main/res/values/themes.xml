@@ -67,6 +67,18 @@
 
     <style name="Theme.WhitelistBypass" parent="Base.Theme.WhitelistBypass" />
 
+    <style name="Theme.WhitelistBypass.Violet" parent="Base.Theme.WhitelistBypass">
+        <item name="colorPrimary">@color/accent_violet</item>
+        <item name="colorPrimaryContainer">@color/accent_violet_soft</item>
+        <item name="colorOnPrimaryContainer">@color/accent_violet</item>
+        <item name="colorSecondary">@color/accent_violet</item>
+        <item name="colorSecondaryContainer">@color/accent_violet_soft</item>
+        <item name="colorOnSecondaryContainer">@color/accent_violet</item>
+        <item name="colorTertiary">@color/accent_violet</item>
+        <item name="colorTertiaryContainer">@color/accent_violet_soft</item>
+        <item name="colorOnTertiaryContainer">@color/accent_violet</item>
+    </style>
+
     <style name="StatCell">
         <item name="android:layout_height">wrap_content</item>
         <item name="android:orientation">vertical</item>
@@ -137,7 +149,7 @@
         <item name="android:layout_height">22dp</item>
         <item name="android:layout_marginStart">12dp</item>
         <item name="android:src">@drawable/ic_check</item>
-        <item name="android:tint">@color/accent_emerald</item>
+        <item name="android:tint">?attr/colorPrimary</item>
         <item name="android:visibility">invisible</item>
     </style>
 </resources>

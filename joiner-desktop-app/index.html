@@ -9,7 +9,16 @@
   <body>
     <header>
       <h1>WhitelistBypass Joiner</h1>
-      <div class="status" id="status" data-state="idle">idle</div>
+      <div class="header-actions">
+        <label class="theme-control">
+          Theme
+          <select id="theme">
+            <option value="cyan">Mint / Cyan</option>
+            <option value="violet">Violet</option>
+          </select>
+        </label>
+        <div class="status" id="status" data-state="idle">idle</div>
+      </div>
     </header>
     <main>
       <section class="form">
@@ -87,26 +96,17 @@
           <input id="serviceControl" type="checkbox" />
           Service-call control
         </label>
-        <div class="row">
-          <label>
-            Service user ID
-            <input id="serviceUserId" type="text" placeholder="stable-user-id" />
-          </label>
-          <label>
-            Cookie JSON path
-            <input id="serviceCookieFile" type="text" placeholder="cookies-yandex.json" />
-          </label>
-        </div>
-        <div class="row">
-          <label>
-            Cookie platform
-            <select id="serviceCookiePlatform">
-              <option value="telemost" selected>Telemost</option>
-              <option value="vk">VK</option>
-              <option value="dion">DION</option>
-              <option value="wbstream">WB Stream</option>
-            </select>
-          </label>
+        <div class="service-settings" id="serviceSettings">
+          <div class="service-auth-row">
+            <div>
+              <strong>Yandex session</strong>
+              <span class="hint" id="serviceAuthStatus">Checking...</span>
+            </div>
+            <div class="service-auth-actions">
+              <button type="button" class="secondary" id="serviceLogin">Sign in</button>
+              <button type="button" class="secondary danger-text" id="serviceForget">Forget</button>
+            </div>
+          </div>
           <label>
             Work platform
             <select id="serviceWorkPlatform">

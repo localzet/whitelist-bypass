@@ -46,6 +46,7 @@ import bypass.whitelist.ui.MainActivityHost
 import bypass.whitelist.ui.MainFragment
 import bypass.whitelist.ui.SettingsScreenFragment
 import bypass.whitelist.util.LogWriter
+import bypass.whitelist.util.AccentMode
 import bypass.whitelist.util.Net
 import bypass.whitelist.util.Prefs
 import bypass.whitelist.util.SocksAuth
@@ -104,6 +105,7 @@ class MainActivity :
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(if (Prefs.accentMode == AccentMode.VIOLET) R.style.Theme_WhitelistBypass_Violet else R.style.Theme_WhitelistBypass)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
@@ -583,7 +585,7 @@ class MainActivity :
     }
 
     private fun applyNavVisual(icon: ImageView, label: TextView, emphasis: Float) {
-        val accent = getColor(R.color.accent_emerald)
+        val accent = bypass.whitelist.util.AccentColors.primary(this)
         val ink = getColor(R.color.ink_3)
         val blended = navColorEvaluator.evaluate(emphasis, ink, accent) as Int
         icon.setColorFilter(blended)

@@ -20,6 +20,18 @@ import { Platform, Bridge, BotTabData, LogPanel, TunnelMode, HeadlessMode } from
 
 declare const window: Window & { bridge: Bridge };
 
+function currentTheme(): 'cyan' | 'violet' {
+  return localStorage.getItem('creator:theme') === 'violet' ? 'violet' : 'cyan';
+}
+
+function applyTheme(theme: string): void {
+  const value = theme === 'violet' ? 'violet' : 'cyan';
+  document.body.dataset.theme = value;
+  localStorage.setItem('creator:theme', value);
+}
+
+applyTheme(currentTheme());
+
 const tm = new RendererTabManager(() => {
   renderTabs(tm);
   renderContent(tm);
@@ -81,6 +93,7 @@ function bindActionBarEvents(): void {
 function bindSettingsEvents(): void {
   document.getElementById('btnSettingsCancel')!.addEventListener('click', closeSettings);
   document.getElementById('btnSettingsSave')!.addEventListener('click', () => {
+    applyTheme((document.getElementById('themeSelect') as HTMLSelectElement).value);
     tm.botSettings.token = (document.getElementById('vkToken') as HTMLInputElement).value.trim();
     tm.botSettings.groupId = (document.getElementById('vkGroupId') as HTMLInputElement).value.trim();
     tm.botSettings.userId = (document.getElementById('vkUserId') as HTMLInputElement).value.trim();
@@ -177,6 +190,7 @@ function openSettings(): void {
   (document.getElementById('upstreamPass') as HTMLInputElement).value = tm.upstreamProxy.pass;
   (document.getElementById('egressConfig') as HTMLInputElement).value = tm.upstreamProxy.egressConfig;
   document.getElementById('clearCookiesStatus')!.textContent = '';
+  (document.getElementById('themeSelect') as HTMLSelectElement).value = currentTheme();
 }
 
 function closeSettings(): void {

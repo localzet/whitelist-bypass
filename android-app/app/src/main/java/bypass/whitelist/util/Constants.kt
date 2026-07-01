@@ -46,6 +46,11 @@ enum class ThemeMode(val label: String) {
     DARK("Dark"),
 }
 
+enum class AccentMode(val label: String) {
+    CYAN("Mint / Cyan"),
+    VIOLET("Violet"),
+}
+
 object PrefsKeys {
     const val CONNECT_ON_START = "connect_on_start"
     const val TUNNEL_MODE = "tunnel_mode"
@@ -69,6 +74,7 @@ object PrefsKeys {
     const val SAVED_DESTINATIONS = "saved_destinations"
     const val ACTIVE_DESTINATION_ID = "active_destination_id"
     const val THEME_MODE = "theme_mode"
+    const val ACCENT_MODE = "accent_mode"
     const val DISCOVERED_EGRESS_LIST = "discovered_egress_list"
     const val DISCOVERED_EGRESS_PROBES = "discovered_egress_probes"
     const val SERVICE_USER_ID = "service_user_id"

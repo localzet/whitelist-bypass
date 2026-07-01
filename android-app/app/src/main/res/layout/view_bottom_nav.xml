@@ -50,7 +50,7 @@
                 android:layout_width="22dp"
                 android:layout_height="22dp"
                 android:src="@drawable/ic_nav_main"
-                app:tint="@color/accent_emerald" />
+                app:tint="?attr/colorPrimary" />
 
             <TextView
                 android:id="@+id/navMainLabel"
@@ -61,7 +61,7 @@
                 android:letterSpacing="0.14"
                 android:textAllCaps="true"
                 android:text="@string/nav_main"
-                android:textColor="@color/accent_emerald"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>

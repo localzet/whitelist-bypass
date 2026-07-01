@@ -143,6 +143,12 @@ object Prefs {
         }
         set(value) = prefs.edit { putString(PrefsKeys.THEME_MODE, value.name) }
 
+    var accentMode: AccentMode
+        get() = runCatching {
+            AccentMode.valueOf(prefs.getString(PrefsKeys.ACCENT_MODE, AccentMode.CYAN.name)!!)
+        }.getOrDefault(AccentMode.CYAN)
+        set(value) = prefs.edit { putString(PrefsKeys.ACCENT_MODE, value.name) }
+
     val serviceUserId: String
         get() {
             prefs.getString(PrefsKeys.SERVICE_USER_ID, null)?.let { stored ->

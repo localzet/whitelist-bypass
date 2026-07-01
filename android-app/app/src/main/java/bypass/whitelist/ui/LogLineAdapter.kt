@@ -51,14 +51,14 @@ class LogLineAdapter(private val maxLines: Int = 500) : RecyclerView.Adapter<Log
 
             icon.setImageResource(iconFor(parsed.component))
             val (boxBackground, iconColor, messageColor) = when (parsed.level) {
-                Level.OK -> Triple(R.drawable.bg_log_box_ok, R.color.accent_emerald, R.color.ink)
-                Level.WARN -> Triple(R.drawable.bg_log_box_warn, R.color.warn_amber, R.color.ink)
-                Level.ERR -> Triple(R.drawable.bg_log_box_err, R.color.error_red, R.color.error_red)
-                Level.INFO -> Triple(R.drawable.bg_settings_row_icon, R.color.ink_2, R.color.ink)
+                Level.OK -> Triple(R.drawable.bg_log_box_ok, bypass.whitelist.util.AccentColors.primary(context), context.getColor(R.color.ink))
+                Level.WARN -> Triple(R.drawable.bg_log_box_warn, context.getColor(R.color.warn_amber), context.getColor(R.color.ink))
+                Level.ERR -> Triple(R.drawable.bg_log_box_err, context.getColor(R.color.error_red), context.getColor(R.color.error_red))
+                Level.INFO -> Triple(R.drawable.bg_settings_row_icon, context.getColor(R.color.ink_2), context.getColor(R.color.ink))
             }
             iconBox.setBackgroundResource(boxBackground)
-            icon.setColorFilter(context.getColor(iconColor))
-            message.setTextColor(context.getColor(messageColor))
+            icon.setColorFilter(iconColor)
+            message.setTextColor(messageColor)
         }
     }
 

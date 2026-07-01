@@ -47,7 +47,7 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="monospace"
                 android:text="@string/jshook_pill_label"
-                android:textColor="@color/accent_emerald"
+                android:textColor="?attr/colorPrimary"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>

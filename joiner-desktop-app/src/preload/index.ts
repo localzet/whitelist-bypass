@@ -1,9 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, JoinerSettings, EgressDescriptor, EgressProbeResult } from '../constants';
+import { IPC, JoinerSettings, EgressDescriptor, EgressProbeResult, ServiceAuthStatus } from '../constants';
 
 contextBridge.exposeInMainWorld('bridge', {
   start: (settings: JoinerSettings) => ipcRenderer.invoke(IPC.START, settings),
   stop: () => ipcRenderer.invoke(IPC.STOP),
+  serviceAuthStatus: (): Promise<ServiceAuthStatus> => ipcRenderer.invoke(IPC.SERVICE_AUTH_STATUS),
+  serviceAuthLogin: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke(IPC.SERVICE_AUTH_LOGIN),
+  serviceAuthClear: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(IPC.SERVICE_AUTH_CLEAR),
   onLog(cb: (text: string) => void) {
     ipcRenderer.on(IPC.LOG, (_e, text) => cb(text));
   },

@@ -22,6 +22,9 @@ function platformLabel(p: JoinerPlatform | null): string {
 interface Bridge {
   start(settings: any): Promise<{ ok: boolean; error?: string }>;
   stop(): Promise<{ ok: boolean }>;
+  serviceAuthStatus(): Promise<{ authenticated: boolean }>;
+  serviceAuthLogin(): Promise<{ ok: boolean; error?: string }>;
+  serviceAuthClear(): Promise<{ ok: boolean }>;
   onLog(cb: (text: string) => void): void;
   onStatus(cb: (status: string) => void): void;
   onRunning(cb: (running: boolean) => void): void;
@@ -48,7 +51,20 @@ const egressOptions = $('egressOptions') as HTMLDataListElement;
 let discoveredEgresses: EgressDescriptor[] = [];
 const egressProbes = new Map<string, EgressProbeResult>();
 const linkInput = input('link');
+const serviceControl = input('serviceControl');
+const serviceSettings = $('serviceSettings');
+const serviceAuthStatus = $('serviceAuthStatus');
+const themeSelect = select('theme');
 const savedSettingsRaw = localStorage.getItem('joiner:lastSettings');
+
+function applyTheme(theme: string) {
+  const value = theme === 'violet' ? 'violet' : 'cyan';
+  document.body.dataset.theme = value;
+  themeSelect.value = value;
+  localStorage.setItem('joiner:theme', value);
+}
+applyTheme(localStorage.getItem('joiner:theme') ?? 'cyan');
+themeSelect.addEventListener('change', () => applyTheme(themeSelect.value));
 
 if (savedSettingsRaw) {
   try {
@@ -67,14 +83,37 @@ if (savedSettingsRaw) {
     input('noTun').checked = Boolean(saved.noTun);
     input('dualTrack').checked = Boolean(saved.dualTrack);
     input('serviceControl').checked = Boolean(saved.serviceControl);
-    input('serviceUserId').value = saved.serviceUserId ?? '';
-    input('serviceCookieFile').value = saved.serviceCookieFile ?? '';
-    select('serviceCookiePlatform').value = saved.serviceCookiePlatform ?? 'telemost';
     select('serviceWorkPlatform').value = saved.serviceWorkPlatform ?? 'telemost';
   } catch {
     localStorage.removeItem('joiner:lastSettings');
   }
 }
+
+function refreshServiceVisibility() {
+  serviceSettings.classList.toggle('visible', serviceControl.checked);
+}
+
+async function refreshServiceAuthStatus() {
+  const state = await bridge.serviceAuthStatus();
+  serviceAuthStatus.textContent = state.authenticated ? 'Session saved' : 'Sign-in required';
+  serviceAuthStatus.dataset.authenticated = String(state.authenticated);
+}
+
+serviceControl.addEventListener('change', refreshServiceVisibility);
+refreshServiceVisibility();
+void refreshServiceAuthStatus();
+
+$('serviceLogin').addEventListener('click', async () => {
+  serviceAuthStatus.textContent = 'Waiting for Yandex sign-in...';
+  const result = await bridge.serviceAuthLogin();
+  if (!result.ok && result.error) appendLog(`[ui] Yandex sign-in: ${result.error}\n`);
+  await refreshServiceAuthStatus();
+});
+
+$('serviceForget').addEventListener('click', async () => {
+  await bridge.serviceAuthClear();
+  await refreshServiceAuthStatus();
+});
 
 stopBtn.disabled = true;
 
@@ -167,9 +206,6 @@ startBtn.addEventListener('click', async () => {
     noTun: input('noTun').checked,
     dualTrack: input('dualTrack').checked,
     serviceControl: input('serviceControl').checked,
-    serviceUserId: input('serviceUserId').value.trim(),
-    serviceCookieFile: input('serviceCookieFile').value.trim(),
-    serviceCookiePlatform: select('serviceCookiePlatform').value,
     serviceWorkPlatform: select('serviceWorkPlatform').value,
   };
   localStorage.setItem('joiner:lastSettings', JSON.stringify(settings));

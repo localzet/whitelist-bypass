@@ -40,8 +40,8 @@ class ConfirmActionSheet : BottomSheetDialogFragment() {
 
         if (destructive) {
             val context = requireContext()
-            titleView.setTextColor(context.getColor(R.color.accent_emerald))
-            confirm.backgroundTintList = ColorStateList.valueOf(context.getColor(R.color.accent_emerald))
+            titleView.setTextColor(bypass.whitelist.util.AccentColors.primary(context))
+            confirm.backgroundTintList = ColorStateList.valueOf(bypass.whitelist.util.AccentColors.primary(context))
             confirm.setTextColor(context.getColor(R.color.panel_bg))
         }
 

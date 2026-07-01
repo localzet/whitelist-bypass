@@ -63,7 +63,7 @@ class ChoiceActionSheet : BottomSheetDialogFragment() {
                 row.setBackgroundResource(R.drawable.bg_destination_card_active)
                 checkBox.setBackgroundResource(R.drawable.bg_action_check_active)
                 checkIcon.visibility = View.VISIBLE
-                rowTitle.setTextColor(requireContext().getColor(R.color.accent_emerald))
+                rowTitle.setTextColor(bypass.whitelist.util.AccentColors.primary(requireContext()))
             }
 
             row.setOnClickListener {

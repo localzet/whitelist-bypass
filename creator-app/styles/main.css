@@ -1,3 +1,15 @@
+:root {
+  --accent: #20c9b0;
+  --accent-hover: #0ea58f;
+  --accent-contrast: #071d1a;
+}
+
+body[data-theme="violet"] {
+  --accent: #9b7cf6;
+  --accent-hover: #7c5ce0;
+  --accent-contrast: #130d24;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -297,7 +309,7 @@ body {
 }
 
 .headless-link {
-  color: #4fc3f7;
+  color: var(--accent);
   cursor: pointer;
 }
 
@@ -361,7 +373,7 @@ body {
 }
 
 .headless-start-input:focus {
-  border-color: #4fc3f7;
+  border-color: var(--accent);
 }
 
 .headless-start-input.invalid {
@@ -392,14 +404,14 @@ body {
 }
 
 .headless-start-btn.primary {
-  background: #0077ff;
-  border-color: #0077ff;
-  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .headless-start-btn.primary:hover {
-  background: #0066dd;
-  border-color: #0066dd;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .headless-tunnel {
@@ -484,7 +496,7 @@ body {
 }
 
 .log-content.relay {
-  color: #4fc3f7;
+  color: var(--accent);
 }
 
 .log-content.hook {
@@ -513,6 +525,8 @@ body {
   border-radius: 12px;
   padding: 24px;
   width: 400px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
@@ -531,7 +545,8 @@ body {
   font-weight: 500;
 }
 
-.popup input {
+.popup input,
+.popup select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #444;
@@ -545,8 +560,10 @@ body {
 }
 
 .popup input:focus {
-  border-color: #0077ff;
+  border-color: var(--accent);
 }
+
+.popup select { margin-bottom: 16px; }
 
 .popup-buttons {
   display: flex;
@@ -564,8 +581,8 @@ body {
 }
 
 .btn-save {
-  background: #0077ff;
-  color: white;
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .btn-cancel {

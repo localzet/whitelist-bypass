@@ -185,7 +185,7 @@
                     android:layout_height="18dp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_plus"
-                    app:tint="@color/accent_emerald" />
+                    app:tint="?attr/colorPrimary" />
             </FrameLayout>
 
             <LinearLayout
@@ -199,7 +199,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/empty_calls_title"
-                    android:textColor="@color/accent_emerald"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="14sp"
                     android:textStyle="bold" />
 
@@ -299,7 +299,7 @@
                     android:layout_weight="1"
                     android:fontFamily="monospace"
                     android:text=""
-                    android:textColor="@color/accent_emerald"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="11sp" />
 
                 <TextView
@@ -308,7 +308,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:text=""
-                    android:textColor="@color/accent_emerald"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="11sp"
                     android:textStyle="bold" />
             </LinearLayout>

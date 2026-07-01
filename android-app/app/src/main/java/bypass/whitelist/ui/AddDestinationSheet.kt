@@ -106,7 +106,7 @@ class AddDestinationSheet : BottomSheetDialogFragment() {
 
     private fun flashChip(chip: LinearLayout, label: TextView) {
         chip.setBackgroundResource(R.drawable.bg_paste_chip_flash)
-        label.setTextColor(requireContext().getColor(R.color.accent_emerald))
+        label.setTextColor(bypass.whitelist.util.AccentColors.primary(requireContext()))
         chip.postDelayed({
             if (isAdded) {
                 chip.setBackgroundResource(R.drawable.bg_paste_chip)

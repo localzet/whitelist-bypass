@@ -64,9 +64,9 @@ class MenuActionSheet : BottomSheetDialogFragment() {
             }
             icon.setImageResource(item.iconRes)
             if (item.danger) {
-                label.setTextColor(requireContext().getColor(R.color.accent_emerald))
+                label.setTextColor(bypass.whitelist.util.AccentColors.primary(requireContext()))
                 iconBox.setBackgroundResource(R.drawable.bg_settings_row_icon_danger)
-                icon.setColorFilter(requireContext().getColor(R.color.accent_emerald))
+                icon.setColorFilter(bypass.whitelist.util.AccentColors.primary(requireContext()))
             }
             row.setOnClickListener {
                 onSelect?.invoke(item)

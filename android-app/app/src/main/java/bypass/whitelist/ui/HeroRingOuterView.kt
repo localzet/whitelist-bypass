@@ -12,8 +12,8 @@ import android.os.Build
 import android.util.AttributeSet
 import android.view.View
 import android.view.animation.LinearInterpolator
-import androidx.core.content.ContextCompat
 import bypass.whitelist.R
+import bypass.whitelist.util.AccentColors
 
 class HeroRingOuterView @JvmOverloads constructor(
     context: Context,
@@ -31,8 +31,8 @@ class HeroRingOuterView @JvmOverloads constructor(
     private var spinDesired = false
     private var currentState: State = State.IDLE
 
-    private val accent = ContextCompat.getColor(context, R.color.accent_emerald)
-    private val accentSoft = ContextCompat.getColor(context, R.color.accent_emerald_soft)
+    private val accent = AccentColors.primary(context)
+    private val accentSoft = AccentColors.container(context)
     private val transparent = 0
 
     private var cachedGradient: SweepGradient? = null

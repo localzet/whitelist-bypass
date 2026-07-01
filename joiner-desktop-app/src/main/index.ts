@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, session } from 'electron';
 import { spawn, ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { dirname, join } from 'node:path';
 import { IPC, JoinerSettings, EgressDescriptor, EgressProbeResult } from '../constants';
 
 // Single global joiner process. We never run two tunnels at once: the
@@ -9,12 +10,122 @@ import { IPC, JoinerSettings, EgressDescriptor, EgressProbeResult } from '../con
 let joinerProcess: ChildProcess | null = null;
 let mainWindow: BrowserWindow | null = null;
 let captchaWindow: BrowserWindow | null = null;
+let yandexLoginWindow: BrowserWindow | null = null;
 let userRequestedStop = false;
 let switchingToWorkSession = false;
 let reconnectTimer: NodeJS.Timeout | null = null;
 let retryCount = 0;
 let lastSettings: JoinerSettings | null = null;
 const MAX_RETRIES = 8;
+const YANDEX_LOGIN_URL = 'https://passport.yandex.ru/auth?retpath=https%3A%2F%2Ftelemost.yandex.ru%2F';
+const YANDEX_COOKIE_DOMAINS = ['yandex.ru', 'yandex.net', 'ya.ru'];
+
+function serviceUserId(): string {
+  const dir = join(app.getPath('userData'), 'service');
+  const file = join(dir, 'identity');
+  try {
+    const value = readFileSync(file, 'utf8').trim();
+    if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value)) return value;
+  } catch {}
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const value = randomUUID();
+  const temporary = `${file}.tmp`;
+  writeFileSync(temporary, value, { encoding: 'utf8', mode: 0o600 });
+  renameSync(temporary, file);
+  chmodSync(file, 0o600);
+  return value;
+}
+
+function serviceCookieFile(): string {
+  return join(app.getPath('userData'), 'service', serviceUserId(), 'cookies-telemost.json');
+}
+
+function hasServiceCookies(): boolean {
+  try {
+    const cookies = JSON.parse(readFileSync(serviceCookieFile(), 'utf8')) as Array<{ name?: string; value?: string }>;
+    return Array.isArray(cookies) && cookies.some((cookie) => cookie.name === 'Session_id' && Boolean(cookie.value));
+  } catch {
+    return false;
+  }
+}
+
+function yandexSession() {
+  return session.fromPartition(`persist:joiner-yandex-${serviceUserId()}`);
+}
+
+async function exportYandexCookies(): Promise<boolean> {
+  const cookies = (await yandexSession().cookies.get({})).filter((cookie) =>
+    Boolean(cookie.domain && YANDEX_COOKIE_DOMAINS.some((domain) => cookie.domain!.includes(domain))),
+  );
+  if (!cookies.some((cookie) => cookie.name === 'Session_id' && cookie.value)) return false;
+  const target = serviceCookieFile();
+  mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+  const temporary = `${target}.tmp`;
+  try {
+    writeFileSync(temporary, JSON.stringify(cookies), { encoding: 'utf8', mode: 0o600 });
+    renameSync(temporary, target);
+    chmodSync(target, 0o600);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+  return true;
+}
+
+async function openYandexLogin(): Promise<{ ok: boolean; error?: string }> {
+  if (await exportYandexCookies()) return { ok: true };
+  if (yandexLoginWindow && !yandexLoginWindow.isDestroyed()) {
+    yandexLoginWindow.focus();
+    return { ok: false, error: 'Yandex login is already open' };
+  }
+  return new Promise((resolve) => {
+    const ses = yandexSession();
+    let settled = false;
+    const finish = (result: { ok: boolean; error?: string }) => {
+      if (settled) return;
+      settled = true;
+      ses.cookies.removeListener('changed', onCookieChanged);
+      resolve(result);
+    };
+    const onCookieChanged = async (_event: Electron.Event, cookie: Electron.Cookie, cause: string, removed: boolean) => {
+      if (removed || cause === 'expired-overwrite' || cookie.name !== 'Session_id') return;
+      if (!cookie.domain || !YANDEX_COOKIE_DOMAINS.some((domain) => cookie.domain!.includes(domain))) return;
+      try {
+        if (!(await exportYandexCookies())) return;
+        finish({ ok: true });
+        yandexLoginWindow?.close();
+      } catch (error) {
+        finish({ ok: false, error: (error as Error).message });
+      }
+    };
+    ses.cookies.on('changed', onCookieChanged);
+    yandexLoginWindow = new BrowserWindow({
+      width: 520,
+      height: 700,
+      title: 'Yandex sign in',
+      parent: mainWindow ?? undefined,
+      autoHideMenuBar: true,
+      webPreferences: {
+        partition: `persist:joiner-yandex-${serviceUserId()}`,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    yandexLoginWindow.webContents.on('did-fail-load', (_event, code, description, _url, isMainFrame) => {
+      if (!isMainFrame || code === -3) return;
+      finish({ ok: false, error: `Yandex sign in failed: ${description}` });
+      yandexLoginWindow?.close();
+    });
+    void yandexLoginWindow.loadURL(YANDEX_LOGIN_URL).catch((error) => {
+      finish({ ok: false, error: `Yandex sign in failed: ${(error as Error).message}` });
+      yandexLoginWindow?.close();
+    });
+    yandexLoginWindow.on('closed', () => {
+      yandexLoginWindow = null;
+      finish({ ok: false, error: 'Yandex sign in was cancelled' });
+    });
+  });
+}
 
 interface ServiceSessionReady {
   requestId: string;
@@ -138,9 +249,11 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
   if (settings.egressId) args.push('--egress-id', settings.egressId);
   if (settings.serviceControl) {
     args.push('--service-control');
-    if (settings.serviceUserId) args.push('--service-user-id', settings.serviceUserId);
-    if (settings.serviceCookieFile) args.push('--service-cookie-file', settings.serviceCookieFile);
-    if (settings.serviceCookiePlatform) args.push('--service-cookie-platform', settings.serviceCookiePlatform);
+    args.push('--service-user-id', serviceUserId());
+    if (settings.serviceWorkPlatform === 'telemost' && hasServiceCookies()) {
+      args.push('--service-cookie-file', serviceCookieFile());
+      args.push('--service-cookie-platform', 'telemost');
+    }
     if (settings.serviceWorkPlatform) args.push('--service-work-platform', settings.serviceWorkPlatform);
   }
   if (noTun) args.push('--no-tun');
@@ -153,7 +266,10 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
     process.getuid && process.getuid() !== 0;
   const spawnCmd = elevateOnLinux ? 'pkexec' : exe;
   const spawnArgs = elevateOnLinux ? [exe, ...args] : args;
-  const commandLine = [spawnCmd, ...spawnArgs].map((s) => (/\s/.test(s) ? `"${s}"` : s)).join(' ');
+  const loggedArgs = [...spawnArgs];
+  const cookiePathAt = loggedArgs.indexOf('--service-cookie-file');
+  if (cookiePathAt >= 0 && loggedArgs[cookiePathAt + 1]) loggedArgs[cookiePathAt + 1] = '<private-cookie-file>';
+  const commandLine = [spawnCmd, ...loggedArgs].map((s) => (/\s/.test(s) ? `"${s}"` : s)).join(' ');
   send(IPC.LOG, `[main] spawning: ${commandLine}\n`);
   try {
     joinerProcess = spawn(spawnCmd, spawnArgs, { windowsHide: true });
@@ -280,6 +396,19 @@ ipcMain.handle(IPC.START, async (_e, settings: JoinerSettings) => {
   lastSettings = settings;
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   return spawnJoiner(settings);
+});
+
+ipcMain.handle(IPC.SERVICE_AUTH_STATUS, async () => ({
+  authenticated: hasServiceCookies(),
+}));
+
+ipcMain.handle(IPC.SERVICE_AUTH_LOGIN, async () => openYandexLogin());
+
+ipcMain.handle(IPC.SERVICE_AUTH_CLEAR, async () => {
+  if (yandexLoginWindow && !yandexLoginWindow.isDestroyed()) yandexLoginWindow.close();
+  await yandexSession().clearStorageData({ storages: ['cookies'] });
+  rmSync(serviceCookieFile(), { force: true });
+  return { ok: true };
 });
 
 ipcMain.handle(IPC.STOP, async () => {

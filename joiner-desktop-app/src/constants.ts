@@ -6,6 +6,9 @@ export const IPC = {
   RUNNING: 'joiner:running',
   EGRESS_LIST: 'joiner:egress-list',
   EGRESS_PROBE: 'joiner:egress-probe',
+  SERVICE_AUTH_STATUS: 'joiner:service-auth-status',
+  SERVICE_AUTH_LOGIN: 'joiner:service-auth-login',
+  SERVICE_AUTH_CLEAR: 'joiner:service-auth-clear',
 } as const;
 
 export interface EgressDescriptor {
@@ -38,8 +41,9 @@ export interface JoinerSettings {
   noTun: boolean;
   dualTrack: boolean;
   serviceControl: boolean;
-  serviceUserId: string;
-  serviceCookieFile: string;
-  serviceCookiePlatform: JoinerPlatform;
   serviceWorkPlatform: JoinerPlatform;
+}
+
+export interface ServiceAuthStatus {
+  authenticated: boolean;
 }
