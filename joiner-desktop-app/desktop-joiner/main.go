@@ -23,6 +23,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -255,6 +256,7 @@ func main() {
 	)
 	serviceReadyCh := make(chan tunnel.SessionReady, 1)
 	serviceCookieAckCh := make(chan tunnel.CookieAck, 1)
+	serviceRuntime := newServiceControlRuntime()
 	onConnected := func(t tunnel.DataTunnel) {
 		readBuf := common.VP8BufSize
 		if _, ok := t.(*tunnel.DCTunnel); ok {
@@ -272,6 +274,7 @@ func main() {
 			bridge.SetRequestedEgressID("")
 			bridge.SetOnCookieAck(func(ack tunnel.CookieAck) {
 				log.Printf("[service] cookie stored platform=%q request=%q", ack.Platform, ack.RequestID)
+				serviceRuntime.markCookieAcked()
 				select {
 				case serviceCookieAckCh <- ack:
 				default:
@@ -280,13 +283,14 @@ func main() {
 			bridge.SetOnSessionReady(func(session tunnel.SessionReady) {
 				payload, _ := json.Marshal(session)
 				fmt.Printf("SERVICE_SESSION_READY:%s\n", payload)
+				serviceRuntime.markReady()
 				select {
 				case serviceReadyCh <- session:
 				default:
 				}
 			})
 			bridge.MarkReady()
-			go requestServiceSession(bridge, serviceControlConfig{
+			serviceRuntime.startRequestLoop(bridge, serviceControlConfig{
 				UserID:         *serviceUserID,
 				RequestID:      *serviceRequestID,
 				EgressID:       *egressID,
@@ -549,6 +553,57 @@ type serviceControlConfig struct {
 	TunnelMode     string
 }
 
+type serviceControlRuntime struct {
+	ready       chan struct{}
+	readyOnce   sync.Once
+	loopRunning atomic.Bool
+	cookieAcked atomic.Bool
+}
+
+func newServiceControlRuntime() *serviceControlRuntime {
+	return &serviceControlRuntime{ready: make(chan struct{})}
+}
+
+func (rt *serviceControlRuntime) markReady() {
+	rt.readyOnce.Do(func() { close(rt.ready) })
+}
+
+func (rt *serviceControlRuntime) markCookieAcked() {
+	rt.cookieAcked.Store(true)
+}
+
+func (rt *serviceControlRuntime) startRequestLoop(bridge *tunnel.RelayBridge, cfg serviceControlConfig) {
+	if !rt.loopRunning.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		defer rt.loopRunning.Store(false)
+		sessionTicker := time.NewTicker(serviceSessionRetryInterval)
+		defer sessionTicker.Stop()
+		cookieTicker := time.NewTicker(serviceCookieRetryInterval)
+		defer cookieTicker.Stop()
+
+		requestServiceSession(bridge, cfg)
+		for {
+			select {
+			case <-rt.ready:
+				return
+			case <-sessionTicker.C:
+				requestServiceSessionWithoutCookies(bridge, cfg)
+			case <-cookieTicker.C:
+				if strings.TrimSpace(cfg.CookieFile) != "" && !rt.cookieAcked.Load() {
+					requestServiceSession(bridge, cfg)
+				}
+			}
+		}
+	}()
+}
+
+const (
+	serviceSessionRetryInterval = 2 * time.Second
+	serviceCookieRetryInterval  = 10 * time.Second
+)
+
 func requestServiceSession(bridge *tunnel.RelayBridge, cfg serviceControlConfig) {
 	if strings.TrimSpace(cfg.CookieFile) != "" {
 		payload, err := os.ReadFile(cfg.CookieFile)
@@ -573,6 +628,17 @@ func requestServiceSession(bridge *tunnel.RelayBridge, cfg serviceControlConfig)
 		Mode:      cfg.TunnelMode,
 	})
 	log.Printf("[service] requested work session platform=%q egress=%q request=%q", cfg.WorkPlatform, cfg.EgressID, cfg.RequestID)
+}
+
+func requestServiceSessionWithoutCookies(bridge *tunnel.RelayBridge, cfg serviceControlConfig) {
+	bridge.RequestSession(tunnel.SessionCreateRequest{
+		RequestID: cfg.RequestID,
+		UserID:    cfg.UserID,
+		EgressID:  cfg.EgressID,
+		Platform:  cfg.WorkPlatform,
+		Mode:      cfg.TunnelMode,
+	})
+	log.Printf("[service] retried work session request platform=%q egress=%q request=%q", cfg.WorkPlatform, cfg.EgressID, cfg.RequestID)
 }
 
 func newRequestID() string {

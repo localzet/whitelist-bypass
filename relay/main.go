@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -98,6 +99,10 @@ func main() {
 			bridge   *tunnel.RelayBridge
 			bridgeMu sync.Mutex
 		)
+		var serviceRuntime *serviceControlRuntime
+		if serviceCfg.Enabled {
+			serviceRuntime = newServiceControlRuntime()
+		}
 		return func(tun tunnel.DataTunnel) {
 			readBuf := common.VP8BufSize
 			if _, ok := tun.(*tunnel.DCTunnel); ok {
@@ -108,7 +113,7 @@ func main() {
 			if bridge == nil {
 				if serviceCfg.Enabled {
 					bridge = tunnel.NewRelayBridge(tun, "joiner", readBuf, log.Printf)
-					configureServiceBridge(bridge, serviceCfg, func(line string) { fmt.Println(line) })
+					configureServiceBridge(bridge, serviceCfg, serviceRuntime, func(line string) { fmt.Println(line) })
 				} else {
 					bridge = tunnel.NewRelayBridgeWithAuth(tun, "joiner", readBuf, log.Printf, *socksUser, *socksPass)
 					bridge.SetRequestedEgressID(*egressID)
@@ -119,7 +124,7 @@ func main() {
 				bridge.SetPersistentListener(true)
 				bridge.MarkReady()
 				if serviceCfg.Enabled {
-					go requestServiceSession(bridge, serviceCfg)
+					serviceRuntime.startRequestLoop(context.Background(), bridge, serviceCfg)
 					return
 				}
 				addr := fmt.Sprintf("%s:%d", *socksHost, *socksPort)
@@ -135,7 +140,7 @@ func main() {
 				bridge.SetOnConfigAck(onConfigAck)
 			}
 			if serviceCfg.Enabled {
-				go requestServiceSession(bridge, serviceCfg)
+				serviceRuntime.startRequestLoop(context.Background(), bridge, serviceCfg)
 			}
 			log.Printf("relay: tunnel swapped after reconnect")
 		}

@@ -75,11 +75,12 @@ func TestConfigureServiceBridgeEmitsReadyMarker(t *testing.T) {
 	fake := &serviceFakeTunnel{}
 	bridge := tunnel.NewRelayBridge(fake, "joiner", 1024, t.Logf)
 	var emitted string
-	configureServiceBridge(bridge, serviceControlConfig{}, func(line string) { emitted = line })
 	want := tunnel.SessionReady{
 		RequestID: "request-1", SessionID: "session-1", JoinLink: "https://example.test/call",
 		EgressID: "direct", TTLSeconds: 300,
 	}
+	runtime := newServiceControlRuntime()
+	configureServiceBridge(bridge, serviceControlConfig{}, runtime, func(line string) { emitted = line })
 	fake.onData(tunnel.EncodeFrame(tunnel.ControlConnID, tunnel.MsgSessionReady, tunnel.EncodeSessionReadyPayload(want)))
 	if len(emitted) <= len(serviceSessionReadyMarker) || emitted[:len(serviceSessionReadyMarker)] != serviceSessionReadyMarker {
 		t.Fatalf("unexpected marker: %q", emitted)
@@ -90,5 +91,10 @@ func TestConfigureServiceBridgeEmitsReadyMarker(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	select {
+	case <-runtime.ready:
+	default:
+		t.Fatal("runtime was not marked ready")
 	}
 }
