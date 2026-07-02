@@ -79,8 +79,8 @@ class AddDestinationSheet : BottomSheetDialogFragment() {
             }
             val name = inputName.text.toString().trim().ifEmpty { CallConfig.suggestNameFor(link) }
             val egressId = inputEgressId.text.toString().trim().ifEmpty { null }
-            if (serviceControl.isChecked && CallPlatform.fromUrl(link) != CallPlatform.WBSTREAM) {
-                inputLink.error = getString(R.string.sheet_service_wb_only)
+            if (serviceControl.isChecked && CallPlatform.fromUrl(link) != CallPlatform.TELEMOST) {
+                inputLink.error = getString(R.string.sheet_service_tm_only)
                 inputLink.requestFocus()
                 return@setOnClickListener
             }
