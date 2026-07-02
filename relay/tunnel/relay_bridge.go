@@ -121,6 +121,7 @@ func (rb *RelayBridge) SetOnSessionReady(fn func(SessionReady)) {
 }
 
 func (rb *RelayBridge) RequestSession(request SessionCreateRequest) {
+	rb.logFn("relay: sending SessionCreate request=%q platform=%q egress=%q", request.RequestID, request.Platform, request.EgressID)
 	rb.send(ControlConnID, MsgSessionCreate, EncodeSessionCreatePayload(request))
 }
 
@@ -137,6 +138,7 @@ func (rb *RelayBridge) SetOnCookieAck(fn func(CookieAck)) {
 }
 
 func (rb *RelayBridge) SubmitCookies(cookie CookieSubmit) {
+	rb.logFn("relay: sending CookieSubmit request=%q platform=%q bytes=%d", cookie.RequestID, cookie.Platform, len(cookie.Payload))
 	rb.send(ControlConnID, MsgCookieSubmit, EncodeCookieSubmitPayload(cookie))
 }
 
@@ -303,6 +305,7 @@ func (rb *RelayBridge) MarkReady() {
 
 func (rb *RelayBridge) sendClientHello() {
 	requested := rb.requestedEgress()
+	rb.logFn("relay: sending ClientHello egress=%q", requested)
 	rb.send(ControlConnID, MsgClientHello, EncodeClientHelloPayload(requested))
 	if requested != "" {
 		rb.logFn("relay: requested egress %q", requested)
@@ -415,6 +418,7 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 		}
 		if connID == ControlConnID && msgType == MsgClientHello {
 			if rb.mode == "creator" {
+				rb.logFn("relay: received ClientHello")
 				hello, ok := DecodeClientHello(payload)
 				if !ok {
 					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("bad_client_hello", "invalid egress handshake"))
@@ -432,6 +436,7 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 		}
 		if connID == ControlConnID && msgType == MsgServerHello {
 			if rb.mode == "joiner" {
+				rb.logFn("relay: received ServerHello")
 				hello, ok := DecodeServerHello(payload)
 				if !ok {
 					rb.setHandshakeError(fmt.Errorf("invalid server egress handshake"))
@@ -509,6 +514,7 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 		}
 		if connID == ControlConnID && msgType == MsgSessionCreate {
 			if rb.mode == "creator" {
+				rb.logFn("relay: received SessionCreate payload=%dB", len(payload))
 				request, ok := DecodeSessionCreate(payload)
 				if !ok {
 					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("bad_session_request", "invalid session request"))
@@ -533,6 +539,7 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 		}
 		if connID == ControlConnID && msgType == MsgSessionReady {
 			if rb.mode == "joiner" {
+				rb.logFn("relay: received SessionReady payload=%dB", len(payload))
 				session, ok := DecodeSessionReady(payload)
 				if !ok {
 					rb.logFn("relay: invalid session ready response")
@@ -549,6 +556,7 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 		}
 		if connID == ControlConnID && msgType == MsgCookieSubmit {
 			if rb.mode == "creator" {
+				rb.logFn("relay: received CookieSubmit payload=%dB", len(payload))
 				cookie, ok := DecodeCookieSubmit(payload)
 				if !ok {
 					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("bad_cookie_submit", "invalid cookie payload"))
@@ -573,6 +581,7 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 		}
 		if connID == ControlConnID && msgType == MsgCookieAck {
 			if rb.mode == "joiner" {
+				rb.logFn("relay: received CookieAck payload=%dB", len(payload))
 				ack, ok := DecodeCookieAck(payload)
 				if !ok {
 					rb.logFn("relay: invalid cookie ack")

@@ -602,11 +602,14 @@ func (rt *serviceControlRuntime) startRequestLoop(bridge *tunnel.RelayBridge, cf
 		cookieTicker := time.NewTicker(serviceCookieRetryInterval)
 		defer cookieTicker.Stop()
 
-		requestServiceSession(bridge, cfg)
+		requestTimer := time.NewTimer(serviceSessionRetryInterval)
+		defer requestTimer.Stop()
 		for {
 			select {
 			case <-rt.ready:
 				return
+			case <-requestTimer.C:
+				requestServiceSession(bridge, cfg)
 			case <-sessionTicker.C:
 				requestServiceSessionWithoutCookies(bridge, cfg)
 			case <-cookieTicker.C:
