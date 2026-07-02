@@ -1,0 +1,33 @@
+services:
+  creator-service:
+    image: ${CREATOR_IMAGE:-ghcr.io/kulikov0/whitelist-bypass-creator-service:latest}
+    container_name: whitelist-bypass-creator-service
+    restart: unless-stopped
+    environment:
+      USER_ID: ${USER_ID:?Set USER_ID in .env}
+      WORK_PLATFORM: ${WORK_PLATFORM:-telemost}
+      RESOURCES: ${RESOURCES:-default}
+      VAULT_KEY_FILE: /run/secrets/vault_key
+      SERVICE_COOKIES: /run/secrets/service_cookies
+      EGRESS_CONFIG: /config/egresses.json
+    secrets:
+      - vault_key
+      - service_cookies
+    volumes:
+      - creator-data:/data
+      - ./egresses.json:/config/egresses.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /data/service-call.txt"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+
+secrets:
+  vault_key:
+    file: ./secrets/vault-key.txt
+  service_cookies:
+    file: ./secrets/cookies-wbstream.json
+
+volumes:
+  creator-data:

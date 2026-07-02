@@ -8,11 +8,17 @@ EGRESS_CONFIG="${EGRESS_CONFIG:-}"
 
 if [ "${SERVICE_MODE:-}" = "creator-service" ]; then
     : "${USER_ID:?USER_ID is required}"
-    : "${VAULT_KEY_BASE64:?VAULT_KEY_BASE64 is required}"
+    if [ -n "${VAULT_KEY_FILE:-}" ]; then
+        VAULT_KEY_BASE64="$(cat "$VAULT_KEY_FILE")"
+    fi
+    : "${VAULT_KEY_BASE64:?VAULT_KEY_BASE64 or VAULT_KEY_FILE is required}"
     SERVICE_COOKIES="${SERVICE_COOKIES:-/data/cookies-wbstream.json}"
     VAULT_DIR="${VAULT_DIR:-/data/vault}"
     WORK_PLATFORM="${WORK_PLATFORM:-telemost}"
     SERVICE_WRITE_FILE="${SERVICE_WRITE_FILE:-/data/service-call.txt}"
+
+    mkdir -p "$VAULT_DIR" "$SESSIONS_DIR"
+    rm -f "$SERVICE_WRITE_FILE"
 
     set -- \
         --user-id "$USER_ID" \

@@ -53,6 +53,7 @@ Traffic goes through the platform's SFU, which is on the government whitelist. T
 - `headless/wbstream-joiner/` - Desktop WB Stream joiner (counterpart to the creator, used for tests and Linux clients)
 - `headless/telemost-joiner/` - Desktop Telemost joiner (counterpart to the creator, used for tests and Linux clients)
 - `headless/vk-bot/` - Standalone VK Long Poll bot that spawns headless creators on demand and replies with the join link (server-side alternative to the Electron bot)
+- `headless/creator-service/` - Call-carried server control plane that creates one work call per client and selected egress; deployable as `whitelist-bypass-creator-service` from GHCR
 - `headless/tests/` - End-to-end smoke tests for each platform
 - `android-app/` - Android joiner: VpnService + tun2socks + headless Pion (primary path); also retains a `WebView` fallback for the legacy browser flow
 - `ios-proxy-app/` - iOS joiner: SOCKS5 + headless Pion via the gomobile xcframework

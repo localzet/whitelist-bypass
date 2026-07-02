@@ -1,0 +1,44 @@
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS build
+ARG TARGETOS
+ARG TARGETARCH
+ENV CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH
+WORKDIR /src
+
+COPY relay /src/relay
+COPY headless /src/headless
+
+RUN go -C /src/headless/vk build -trimpath -ldflags="-s -w" -o /out/headless-vk-creator . \
+ && go -C /src/headless/telemost build -trimpath -ldflags="-s -w" -o /out/headless-telemost-creator . \
+ && go -C /src/headless/wbstream build -trimpath -ldflags="-s -w" -o /out/headless-wbstream-creator . \
+ && go -C /src/headless/dion build -trimpath -ldflags="-s -w" -o /out/headless-dion-creator . \
+ && go -C /src/headless/creator-service build -trimpath -ldflags="-s -w" -o /out/headless-creator-service .
+
+FROM debian:bookworm-slim
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates tini \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --system --create-home --home /home/wlb --shell /usr/sbin/nologin wlb \
+ && mkdir -p /opt/wlb/bin /data/sessions /data/vault \
+ && chown -R wlb:wlb /data
+
+COPY --from=build /out/headless-vk-creator /opt/wlb/bin/
+COPY --from=build /out/headless-telemost-creator /opt/wlb/bin/
+COPY --from=build /out/headless-wbstream-creator /opt/wlb/bin/
+COPY --from=build /out/headless-dion-creator /opt/wlb/bin/
+COPY --from=build /out/headless-creator-service /usr/local/bin/
+COPY headless/docker/entrypoint.creator-service.sh /usr/local/bin/wlb-entrypoint
+RUN chmod +x /usr/local/bin/wlb-entrypoint
+
+ENV BINS_DIR=/opt/wlb/bin \
+    SESSIONS_DIR=/data/sessions \
+    VAULT_DIR=/data/vault \
+    SERVICE_WRITE_FILE=/data/service-call.txt
+
+USER wlb
+WORKDIR /data
+VOLUME ["/data"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+  CMD test -s "$SERVICE_WRITE_FILE" || exit 1
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/wlb-entrypoint"]

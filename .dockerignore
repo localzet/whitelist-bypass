@@ -1,0 +1,12 @@
+*
+!relay/
+!relay/**
+!headless/
+!headless/**
+headless/docker/.env
+headless/docker/secrets/
+**/cookies*.json
+**/*.key
+**/*.pem
+**/*.exe
+**/*.zip
