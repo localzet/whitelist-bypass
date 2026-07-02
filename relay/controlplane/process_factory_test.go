@@ -63,6 +63,34 @@ func TestCreatorBinaryRejectsUnsupportedPlatform(t *testing.T) {
 	}
 }
 
+func TestProcessFactoryRejectsUnsupportedCookieSource(t *testing.T) {
+	if _, err := NewProcessWorkCallFactory(ProcessFactoryConfig{
+		BinsDir:      t.TempDir(),
+		CookieSource: "unknown",
+	}); err == nil {
+		t.Fatal("NewProcessWorkCallFactory() expected unsupported cookie source error")
+	}
+}
+
+func TestProcessFactorySelectsServiceCookieResolver(t *testing.T) {
+	factory, err := NewProcessWorkCallFactory(ProcessFactoryConfig{
+		BinsDir:        t.TempDir(),
+		Cookies:        StaticCookieResolver{PlatformTelemost: "/user-cookies.json"},
+		ServiceCookies: StaticCookieResolver{PlatformTelemost: "/service-cookies.json"},
+		CookieSource:   "service",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := factory.cookieResolver().CookiePath("user-1", PlatformTelemost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/service-cookies.json" {
+		t.Fatalf("CookiePath() = %q, want service cookies", path)
+	}
+}
+
 func TestWaitForFirstLineReturnsWhenCreatorExits(t *testing.T) {
 	done := make(chan error, 1)
 	done <- os.ErrPermission

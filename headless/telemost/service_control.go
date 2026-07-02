@@ -13,16 +13,18 @@ import (
 )
 
 type serviceControlOptions struct {
-	UserIDs        string
-	VaultDir       string
-	VaultKey       string
-	BinsDir        string
-	SessionsDir    string
-	EgressConfig   string
-	Resources      string
-	WorkPlatform   string
-	MaxActiveUsers int
-	WorkTTL        time.Duration
+	UserIDs          string
+	VaultDir         string
+	VaultKey         string
+	BinsDir          string
+	SessionsDir      string
+	EgressConfig     string
+	Resources        string
+	WorkPlatform     string
+	WorkCookieSource string
+	ServiceCookies   string
+	MaxActiveUsers   int
+	WorkTTL          time.Duration
 }
 
 func configureServiceControl(opts serviceControlOptions) (func(*tunnel.RelayBridge) error, error) {
@@ -58,6 +60,8 @@ func configureServiceControl(opts serviceControlOptions) (func(*tunnel.RelayBrid
 		Resources:       opts.Resources,
 		EgressConfig:    opts.EgressConfig,
 		Cookies:         vault,
+		ServiceCookies:  controlplane.StaticCookieResolver{controlplane.PlatformTelemost: opts.ServiceCookies},
+		CookieSource:    opts.WorkCookieSource,
 		DefaultPlatform: opts.WorkPlatform,
 	})
 	if err != nil {
@@ -75,7 +79,7 @@ func configureServiceControl(opts serviceControlOptions) (func(*tunnel.RelayBrid
 		CookieVault:    vault,
 		Sessions:       orchestrator,
 	}
-	log.Printf("[service] transport=telemost allowed-users=%d max-active-users=%d work-ttl=%s", len(allowedUsers), opts.MaxActiveUsers, opts.WorkTTL)
+	log.Printf("[service] transport=telemost allowed-users=%d max-active-users=%d work-ttl=%s work-cookie-source=%s", len(allowedUsers), opts.MaxActiveUsers, opts.WorkTTL, opts.WorkCookieSource)
 	return func(bridge *tunnel.RelayBridge) error {
 		return handler.BindBridge(context.Background(), bridge)
 	}, nil

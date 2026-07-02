@@ -43,6 +43,8 @@ type ProcessFactoryConfig struct {
 	Resources       string
 	EgressConfig    string
 	Cookies         CookieResolver
+	ServiceCookies  CookieResolver
+	CookieSource    string
 	SpawnTimeout    time.Duration
 	DefaultPlatform string
 }
@@ -69,6 +71,10 @@ func NewProcessWorkCallFactory(cfg ProcessFactoryConfig) (*ProcessWorkCallFactor
 	}
 	if cfg.DefaultPlatform == "" {
 		cfg.DefaultPlatform = PlatformTelemost
+	}
+	cfg.CookieSource = normalizeCookieSource(cfg.CookieSource)
+	if cfg.CookieSource != "user" && cfg.CookieSource != "service" {
+		return nil, fmt.Errorf("controlplane: unsupported cookie source %q", cfg.CookieSource)
 	}
 	return &ProcessWorkCallFactory{
 		cfg:       cfg,
@@ -102,10 +108,11 @@ func (f *ProcessWorkCallFactory) CreateWorkCall(ctx context.Context, request Wor
 
 	args := []string{"--write-file", linkPath, "--resources", f.cfg.Resources}
 	if platformNeedsCookies(platform) {
-		if f.cfg.Cookies == nil {
+		resolver := f.cookieResolver()
+		if resolver == nil {
 			return WorkCall{}, fmt.Errorf("controlplane: cookie resolver is required for platform %q", platform)
 		}
-		cookies, err := f.cfg.Cookies.CookiePath(request.UserID, platform)
+		cookies, err := resolver.CookiePath(request.UserID, platform)
 		if err != nil {
 			return WorkCall{}, err
 		}
@@ -162,6 +169,13 @@ func (f *ProcessWorkCallFactory) CreateWorkCall(ctx context.Context, request Wor
 	return WorkCall{JoinLink: link}, nil
 }
 
+func (f *ProcessWorkCallFactory) cookieResolver() CookieResolver {
+	if f.cfg.CookieSource == "service" && f.cfg.ServiceCookies != nil {
+		return f.cfg.ServiceCookies
+	}
+	return f.cfg.Cookies
+}
+
 func (f *ProcessWorkCallFactory) CloseWorkCall(_ context.Context, session Session) error {
 	f.mu.Lock()
 	cmd := f.processes[session.JoinLink]
@@ -171,6 +185,17 @@ func (f *ProcessWorkCallFactory) CloseWorkCall(_ context.Context, session Sessio
 		return nil
 	}
 	return cmd.Process.Kill()
+}
+
+func normalizeCookieSource(source string) string {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case "", "user", "vault":
+		return "user"
+	case "service", "server":
+		return "service"
+	default:
+		return strings.ToLower(strings.TrimSpace(source))
+	}
 }
 
 func normalizePlatform(platform string) string {

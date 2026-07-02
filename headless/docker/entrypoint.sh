@@ -16,6 +16,7 @@ if [ "${SERVICE_MODE:-}" = "creator-service" ]; then
     SERVICE_COOKIES="${SERVICE_COOKIES:-/data/cookies-yandex.json}"
     VAULT_DIR="${VAULT_DIR:-/data/vault}"
     WORK_PLATFORM="${WORK_PLATFORM:-telemost}"
+    WORK_COOKIE_SOURCE="${WORK_COOKIE_SOURCE:-user}"
     MAX_ACTIVE_USERS="${MAX_ACTIVE_USERS:-2}"
     WORK_TTL="${WORK_TTL:-30m}"
     SERVICE_WRITE_FILE="${SERVICE_WRITE_FILE:-/data/service-call.txt}"
@@ -33,6 +34,7 @@ if [ "${SERVICE_MODE:-}" = "creator-service" ]; then
         --sessions-dir "$SESSIONS_DIR" \
         --resources "$RESOURCES" \
         --work-platform "$WORK_PLATFORM" \
+        --work-cookie-source "$WORK_COOKIE_SOURCE" \
         --max-active-users "$MAX_ACTIVE_USERS" \
         --work-ttl "$WORK_TTL" \
         --write-file "$SERVICE_WRITE_FILE"

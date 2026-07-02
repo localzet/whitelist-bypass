@@ -902,6 +902,7 @@ func main() {
 	binsDir := flag.String("bins-dir", "", "directory containing headless creator binaries")
 	sessionsDir := flag.String("sessions-dir", "", "directory for spawned work creator state and logs")
 	workPlatform := flag.String("work-platform", "telemost", "default work call platform")
+	workCookieSource := flag.String("work-cookie-source", "user", "work call cookies source: user or service")
 	maxActiveUsers := flag.Int("max-active-users", 2, "maximum users with active work calls")
 	workTTL := flag.Duration("work-ttl", 30*time.Minute, "work call lifetime")
 	flag.Parse()
@@ -942,16 +943,18 @@ func main() {
 	)
 	if *serviceMode {
 		bindBridge, err = configureServiceControl(serviceControlOptions{
-			UserIDs:        *serviceUserIDs,
-			VaultDir:       *vaultDir,
-			VaultKey:       *vaultKey,
-			BinsDir:        *binsDir,
-			SessionsDir:    *sessionsDir,
-			EgressConfig:   *egressConfig,
-			Resources:      *resources,
-			WorkPlatform:   *workPlatform,
-			MaxActiveUsers: *maxActiveUsers,
-			WorkTTL:        *workTTL,
+			UserIDs:          *serviceUserIDs,
+			VaultDir:         *vaultDir,
+			VaultKey:         *vaultKey,
+			BinsDir:          *binsDir,
+			SessionsDir:      *sessionsDir,
+			EgressConfig:     *egressConfig,
+			Resources:        *resources,
+			WorkPlatform:     *workPlatform,
+			WorkCookieSource: *workCookieSource,
+			ServiceCookies:   *cookiesPath,
+			MaxActiveUsers:   *maxActiveUsers,
+			WorkTTL:          *workTTL,
 		})
 		if err != nil {
 			log.Fatalf("[service] configure: %v", err)
