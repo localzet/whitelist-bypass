@@ -1,6 +1,6 @@
 services:
   creator-service:
-    image: ${CREATOR_IMAGE:-ghcr.io/kulikov0/whitelist-bypass-creator-service:latest}
+    image: ghcr.io/localzet/whitelist-bypass-creator-service:latest
     container_name: whitelist-bypass-creator-service
     restart: unless-stopped
     environment:
@@ -10,11 +10,11 @@ services:
       MAX_ACTIVE_USERS: ${MAX_ACTIVE_USERS:-2}
       WORK_TTL: ${WORK_TTL:-30m}
       VAULT_KEY_FILE: /run/secrets/vault_key
-      SERVICE_COOKIES: /run/secrets/service_cookies
+      SERVICE_COOKIES: /run/secrets/yandex_cookies
       EGRESS_CONFIG: /config/egresses.json
     secrets:
       - vault_key
-      - service_cookies
+      - yandex_cookies
     volumes:
       - creator-data:/data
       - ./egresses.json:/config/egresses.json:ro
@@ -28,8 +28,8 @@ services:
 secrets:
   vault_key:
     file: ./secrets/vault-key.txt
-  service_cookies:
-    file: ./secrets/cookies-wbstream.json
+  yandex_cookies:
+    file: ./secrets/cookies-yandex.json
 
 volumes:
   creator-data:

@@ -10,8 +10,7 @@ COPY headless /src/headless
 RUN go -C /src/headless/vk build -trimpath -ldflags="-s -w" -o /out/headless-vk-creator . \
  && go -C /src/headless/telemost build -trimpath -ldflags="-s -w" -o /out/headless-telemost-creator . \
  && go -C /src/headless/wbstream build -trimpath -ldflags="-s -w" -o /out/headless-wbstream-creator . \
- && go -C /src/headless/dion build -trimpath -ldflags="-s -w" -o /out/headless-dion-creator . \
- && go -C /src/headless/creator-service build -trimpath -ldflags="-s -w" -o /out/headless-creator-service .
+ && go -C /src/headless/dion build -trimpath -ldflags="-s -w" -o /out/headless-dion-creator .
 
 FROM debian:bookworm-slim
 RUN apt-get update \
@@ -25,7 +24,6 @@ COPY --from=build /out/headless-vk-creator /opt/wlb/bin/
 COPY --from=build /out/headless-telemost-creator /opt/wlb/bin/
 COPY --from=build /out/headless-wbstream-creator /opt/wlb/bin/
 COPY --from=build /out/headless-dion-creator /opt/wlb/bin/
-COPY --from=build /out/headless-creator-service /usr/local/bin/
 COPY headless/docker/entrypoint.creator-service.sh /usr/local/bin/wlb-entrypoint
 RUN chmod +x /usr/local/bin/wlb-entrypoint
 

@@ -13,7 +13,7 @@ if [ "${SERVICE_MODE:-}" = "creator-service" ]; then
         VAULT_KEY_BASE64="$(cat "$VAULT_KEY_FILE")"
     fi
     : "${VAULT_KEY_BASE64:?VAULT_KEY_BASE64 or VAULT_KEY_FILE is required}"
-    SERVICE_COOKIES="${SERVICE_COOKIES:-/data/cookies-wbstream.json}"
+    SERVICE_COOKIES="${SERVICE_COOKIES:-/data/cookies-yandex.json}"
     VAULT_DIR="${VAULT_DIR:-/data/vault}"
     WORK_PLATFORM="${WORK_PLATFORM:-telemost}"
     MAX_ACTIVE_USERS="${MAX_ACTIVE_USERS:-2}"
@@ -24,8 +24,9 @@ if [ "${SERVICE_MODE:-}" = "creator-service" ]; then
     rm -f "$SERVICE_WRITE_FILE"
 
     set -- \
-        --user-ids "$USER_IDS" \
-        --service-cookies "$SERVICE_COOKIES" \
+        --service-control \
+        --service-user-ids "$USER_IDS" \
+        --cookies "$SERVICE_COOKIES" \
         --vault-dir "$VAULT_DIR" \
         --vault-key-base64 "$VAULT_KEY_BASE64" \
         --bins-dir "$BINS_DIR" \
@@ -37,8 +38,8 @@ if [ "${SERVICE_MODE:-}" = "creator-service" ]; then
         --write-file "$SERVICE_WRITE_FILE"
 
     [ -n "$EGRESS_CONFIG" ] && set -- "$@" --egress-config "$EGRESS_CONFIG"
-    [ -n "${SERVICE_ROOM:-}" ] && set -- "$@" --service-room "$SERVICE_ROOM"
-    exec /usr/local/bin/headless-creator-service "$@"
+    [ -n "${SERVICE_ROOM:-}" ] && set -- "$@" --tm-link "$SERVICE_ROOM"
+    exec "$BINS_DIR/headless-telemost-creator" "$@"
 fi
 
 : "${VK_TOKEN:?VK_TOKEN is required}"

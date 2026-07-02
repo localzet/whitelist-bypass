@@ -12,7 +12,7 @@ BINS_DIR="${BINS_DIR:-/opt/wlb/bin}"
 SESSIONS_DIR="${SESSIONS_DIR:-/data/sessions}"
 RESOURCES="${RESOURCES:-default}"
 EGRESS_CONFIG="${EGRESS_CONFIG:-}"
-SERVICE_COOKIES="${SERVICE_COOKIES:-/data/cookies-wbstream.json}"
+SERVICE_COOKIES="${SERVICE_COOKIES:-/data/cookies-yandex.json}"
 VAULT_DIR="${VAULT_DIR:-/data/vault}"
 WORK_PLATFORM="${WORK_PLATFORM:-telemost}"
 MAX_ACTIVE_USERS="${MAX_ACTIVE_USERS:-2}"
@@ -23,8 +23,9 @@ mkdir -p "$VAULT_DIR" "$SESSIONS_DIR"
 rm -f "$SERVICE_WRITE_FILE"
 
 set -- \
-    --user-ids "$USER_IDS" \
-    --service-cookies "$SERVICE_COOKIES" \
+    --service-control \
+    --service-user-ids "$USER_IDS" \
+    --cookies "$SERVICE_COOKIES" \
     --vault-dir "$VAULT_DIR" \
     --vault-key-base64 "$VAULT_KEY_BASE64" \
     --bins-dir "$BINS_DIR" \
@@ -36,6 +37,6 @@ set -- \
     --write-file "$SERVICE_WRITE_FILE"
 
 [ -n "$EGRESS_CONFIG" ] && set -- "$@" --egress-config "$EGRESS_CONFIG"
-[ -n "${SERVICE_ROOM:-}" ] && set -- "$@" --service-room "$SERVICE_ROOM"
+[ -n "${SERVICE_ROOM:-}" ] && set -- "$@" --tm-link "$SERVICE_ROOM"
 
-exec /usr/local/bin/headless-creator-service "$@"
+exec /opt/wlb/bin/headless-telemost-creator "$@"

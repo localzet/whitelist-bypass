@@ -1,6 +1,6 @@
 # Creator service в Docker
 
-Образ `ghcr.io/<owner>/whitelist-bypass-creator-service` запускает WB Stream service-call и принимает `CookieSubmit`/`SessionCreate` только через звонок. Обычный HTTP/WebSocket API между клиентом и сервером не используется.
+Образ `ghcr.io/<owner>/whitelist-bypass-creator-service` создаёт служебный звонок в Telemost и принимает `CookieSubmit`/`SessionCreate` только через его VP8-туннель. Отдельный HTTP/WebSocket API между клиентом и сервером не используется.
 
 ## Подготовка
 
@@ -11,21 +11,23 @@ cp /path/to/docker-compose.creator-service.yml docker-compose.yml
 cp /path/to/.env.creator-service.example .env
 cp /path/to/egresses.example.json egresses.json
 openssl rand -base64 32 > secrets/vault-key.txt
-cp /secure/path/cookies-wbstream.json secrets/cookies-wbstream.json
+cp /secure/path/cookies-yandex.json secrets/cookies-yandex.json
 chmod 600 .env secrets/* egresses.json
 ```
 
-Каждый пользователь открывает service settings в Android/Desktop, копирует `Service client ID` и передаёт его администратору. Добавьте полученные UUID в `.env` через запятую:
+`cookies-yandex.json` должен быть экспортирован из авторизованной сессии Яндекса в Creator. Сервер использует эти cookies только для создания и удержания общего служебного звонка Telemost. Пользовательские cookies поступают от клиентов внутри этого звонка и сохраняются раздельно в зашифрованном vault.
+
+Каждый пользователь копирует `Service client ID` из настроек Android/Desktop и передаёт администратору. Добавьте UUID в `.env` через запятую:
 
 ```env
 USER_IDS=550e8400-e29b-41d4-a716-446655440000,7d444840-9dc0-11d1-b245-5ffdce74fad2
 ```
 
-Один контейнер держит один общий service-call для всего allowlist. Клиенты используют одну service-call ссылку и подключаются к bootstrap-каналу последовательно; после `SessionReady` клиент уходит в свой work-call. Cookie vault и лимит одного work-call разделены по проверенному `USER_ID`.
+Один контейнер держит один общий служебный звонок Telemost. После `SessionReady` клиент отключается от него и переходит в свой рабочий звонок. Vault и лимит одного рабочего звонка разделены по проверенному `USER_ID`.
 
-`MAX_ACTIVE_USERS` ограничивает общее число одновременных work-call независимо от размера allowlist. Для VPS с 1 CPU / 1 GB начните с `MAX_ACTIVE_USERS=2` и `RESOURCES=moderate`; `WORK_TTL` автоматически освобождает забытые work-call (default `30m`).
+`MAX_ACTIVE_USERS` ограничивает общее число одновременно работающих звонков. Для VPS с 1 CPU / 1 GB начните с `MAX_ACTIVE_USERS=2` и `RESOURCES=moderate`. `WORK_TTL` завершает забытые рабочие процессы, по умолчанию через 30 минут.
 
-На этом промежуточном этапе UUID — allowlist identifier, а не криптографический client secret. Не публикуйте service-call ссылку открыто. Следующий security layer должен добавить подписанные client credentials без изменения call-carried транспорта.
+UUID пока является allowlist-идентификатором, а не криптографическим секретом. Не публикуйте ссылку служебного звонка. Следующий слой безопасности должен добавить подписанные client credentials, сохранив транспорт внутри звонка.
 
 ## Запуск
 
@@ -35,13 +37,15 @@ docker compose up -d
 docker compose logs -f creator-service
 ```
 
-После успешного подключения ссылка служебного звонка появится в persistent volume:
+Ссылка служебного звонка сохраняется в persistent volume:
 
 ```sh
 docker compose exec creator-service cat /data/service-call.txt
 ```
 
-Передайте эту WB Stream ссылку всем разрешённым клиентам. Добавьте её как service-call destination, выберите work platform и ручной `egressId`. Клиент передаст свой ID, Yandex cookies и запрос рабочей сессии внутри звонка, остановит служебное подключение после `SessionReady` и подключится к созданному work-call.
+Передайте эту Telemost-ссылку разрешённым клиентам. Добавьте её как service-call destination, выберите рабочую платформу и при необходимости ручной `egressId`.
+
+Чтобы после перезапуска подключаться к уже существующему звонку, задайте `SERVICE_ROOM` равным сохранённой Telemost-ссылке. Без него контейнер создаст новый служебный звонок.
 
 ## Обновление
 
@@ -50,7 +54,7 @@ docker compose pull
 docker compose up -d --remove-orphans
 ```
 
-Не удаляйте volume `creator-data`: в нём находятся зашифрованный cookie vault, session state и текущая service-call ссылка. Vault key храните отдельно от volume и резервной копии данных.
+Не удаляйте volume `creator-data`: в нём находятся зашифрованный cookie vault, состояние процессов и текущая ссылка. Vault key храните отдельно от volume и его резервной копии.
 
 ## Публикация
 

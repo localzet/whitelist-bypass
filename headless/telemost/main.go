@@ -59,6 +59,7 @@ type Bridge struct {
 	upstreamUser  string
 	upstreamPass  string
 	egressReg     *egress.Registry
+	bindBridge    func(*tunnel.RelayBridge) error
 
 	setSlotsKey    int
 	initBundleSent bool
@@ -712,11 +713,17 @@ func (b *Bridge) initRelay() {
 	relay.OnConnected = func(tun *tunnel.VP8DataTunnel) {
 		if b.activeBridge != nil {
 			b.activeBridge.Reset()
+		}
+		b.activeBridge = tunnel.NewRelayBridge(tun, "creator", common.VP8BufSize, log.Printf)
+		if b.bindBridge != nil {
+			if err := b.bindBridge(b.activeBridge); err != nil {
+				log.Printf("[service] bind bridge failed: %v", err)
+			}
+		} else {
+			b.activeBridge.SetEgressRegistry(b.egressReg)
+		}
+		fmt.Print("\n  TUNNEL CONNECTED\n")
 	}
-	b.activeBridge = tunnel.NewRelayBridge(tun, "creator", common.VP8BufSize, log.Printf)
-	b.activeBridge.SetEgressRegistry(b.egressReg)
-	fmt.Print("\n  TUNNEL CONNECTED\n")
-}
 	relay.OnPeerRestart = func() {
 		if b.activeBridge != nil {
 			log.Printf("[relay] new peer detected, resetting relay bridge")
@@ -894,6 +901,15 @@ func main() {
 	upstreamUser := flag.String("upstream-user", "", "upstream SOCKS5 username")
 	upstreamPass := flag.String("upstream-pass", "", "upstream SOCKS5 password")
 	egressConfig := flag.String("egress-config", "", "JSON egress profile config")
+	serviceMode := flag.Bool("service-control", false, "run this Telemost call as a creator service control plane")
+	serviceUserIDs := flag.String("service-user-ids", "", "comma-separated service user allowlist")
+	vaultDir := flag.String("vault-dir", "", "directory for encrypted user cookie vault")
+	vaultKey := flag.String("vault-key-base64", "", "base64 encoded 32-byte cookie vault key")
+	binsDir := flag.String("bins-dir", "", "directory containing headless creator binaries")
+	sessionsDir := flag.String("sessions-dir", "", "directory for spawned work creator state and logs")
+	workPlatform := flag.String("work-platform", "telemost", "default work call platform")
+	maxActiveUsers := flag.Int("max-active-users", 2, "maximum users with active work calls")
+	workTTL := flag.Duration("work-ttl", 30*time.Minute, "work call lifetime")
 	flag.Parse()
 	egressRegistry := loadEgressRegistry(*egressConfig, *upstreamSocks, *upstreamUser, *upstreamPass)
 
@@ -925,6 +941,28 @@ func main() {
 		debug.SetMemoryLimit(memLimit)
 	}
 	log.Printf("[config] resources=%s read-buf=%d mem-limit=%d", *resources, readBuf, memLimit)
+
+	var (
+		bindBridge func(*tunnel.RelayBridge) error
+		err        error
+	)
+	if *serviceMode {
+		bindBridge, err = configureServiceControl(serviceControlOptions{
+			UserIDs:        *serviceUserIDs,
+			VaultDir:       *vaultDir,
+			VaultKey:       *vaultKey,
+			BinsDir:        *binsDir,
+			SessionsDir:    *sessionsDir,
+			EgressConfig:   *egressConfig,
+			Resources:      *resources,
+			WorkPlatform:   *workPlatform,
+			MaxActiveUsers: *maxActiveUsers,
+			WorkTTL:        *workTTL,
+		})
+		if err != nil {
+			log.Fatalf("[service] configure: %v", err)
+		}
+	}
 
 	var cookieStr string
 	if *cookieString != "" {
@@ -979,6 +1017,7 @@ func main() {
 		upstreamUser:  *upstreamUser,
 		upstreamPass:  *upstreamPass,
 		egressReg:     egressRegistry,
+		bindBridge:    bindBridge,
 	}
 	bridge.run()
 }
