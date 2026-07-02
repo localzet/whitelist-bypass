@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">whitelistbypass</string>
+    <string name="app_name">VConnect</string>
     <string name="share_logs">Share logs</string>
     <string name="copy_logs_toast">Logs copied to clipboard</string>
     <string name="autofill_settings_title">Autofill settings</string>

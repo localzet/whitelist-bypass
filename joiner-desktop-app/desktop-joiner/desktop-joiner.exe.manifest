@@ -5,7 +5,7 @@
       name="whitelist.bypass.desktop-joiner"
       version="1.0.0.0"
       processorArchitecture="*"/>
-  <description>Whitelist Bypass Desktop Joiner</description>
+  <description>VConnect Desktop Joiner</description>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>

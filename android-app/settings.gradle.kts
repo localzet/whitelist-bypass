@@ -19,6 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "WhitelistBypass"
+rootProject.name = "VConnect"
 include(":app")
- 

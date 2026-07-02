@@ -131,10 +131,10 @@ Output in `prebuilts/`:
 
 | File | Platform |
 |---|---|
-| `WhitelistBypass Creator-*-arm64.dmg` | macOS |
-| `WhitelistBypass Creator-*-x64.exe` | Windows x64 |
-| `WhitelistBypass Creator-*-ia32.exe` | Windows x86 |
-| `WhitelistBypass Creator-*.AppImage` | Linux x64 |
+| `VConnect Creator-*-arm64.dmg` | macOS |
+| `VConnect Creator-*-x64.exe` | Windows x64 |
+| `VConnect Creator-*-ia32.exe` | Windows x86 |
+| `VConnect Creator-*.AppImage` | Linux x64 |
 | `whitelist-bypass.apk` | Android |
 | `whitelist-bypass-proxy.ipa` | iOS, unsigned |
 | `headless-vk-creator-linux-x64` | Linux x64 |

@@ -171,8 +171,8 @@ jobs:
         with:
           name: creator-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            prebuilts/WhitelistBypass Creator-*
-            prebuilts/WhitelistBypass*Creator*
+            prebuilts/VConnect Creator-*
+            prebuilts/VConnect*Creator*
           if-no-files-found: error
 
   joiner:
@@ -249,8 +249,8 @@ jobs:
         with:
           name: joiner-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            prebuilts/WhitelistBypass Joiner-*
-            prebuilts/WhitelistBypass*Joiner*
+            prebuilts/VConnect Joiner-*
+            prebuilts/VConnect*Joiner*
           if-no-files-found: error
 
   ios:

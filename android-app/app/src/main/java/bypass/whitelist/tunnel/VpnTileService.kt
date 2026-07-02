@@ -58,7 +58,7 @@ class VpnTileService : TileService() {
         ProxyService.requestStop(this)
         qsTile?.let {
             it.state = Tile.STATE_INACTIVE
-            it.label = "whitelistbypass"
+            it.label = "VConnect"
             it.updateTile()
         }
     }
@@ -76,7 +76,7 @@ class VpnTileService : TileService() {
             }
             else -> {
                 tile.state = Tile.STATE_INACTIVE
-                tile.label = "whitelistbypass"
+                tile.label = "VConnect"
             }
         }
         tile.updateTile()

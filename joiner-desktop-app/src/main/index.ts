@@ -197,7 +197,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 900,
     height: 600,
-    title: 'WhitelistBypass Joiner',
+    title: 'VConnect Joiner',
     icon: join(__dirname, '..', '..', 'resources', 'icon.png'),
     webPreferences: {
       preload: join(__dirname, '..', 'preload', 'index.js'),

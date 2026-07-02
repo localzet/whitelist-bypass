@@ -15,7 +15,7 @@
   },
   "build": {
     "appId": "whitelist.bypass.joiner",
-    "productName": "WhitelistBypass Joiner",
+    "productName": "VConnect Joiner",
     "directories": {
       "output": "../prebuilts"
     },

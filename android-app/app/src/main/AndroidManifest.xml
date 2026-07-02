@@ -61,7 +61,7 @@
         </provider>
         <service
             android:name=".tunnel.VpnTileService"
-            android:label="whitelistbypass"
+            android:label="VConnect"
             android:icon="@drawable/ic_power"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             android:exported="true">

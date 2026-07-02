@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "whitelist.bypass.creator",
-    "productName": "WhitelistBypass Creator",
+    "productName": "VConnect Creator",
     "directories": {
       "output": "../prebuilts"
     },

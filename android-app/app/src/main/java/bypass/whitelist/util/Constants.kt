@@ -96,5 +96,5 @@ object Vpn {
     const val MTU = 1500
     const val DNS_PRIMARY = "8.8.8.8"
     const val DNS_SECONDARY = "8.8.4.4"
-    const val SESSION_NAME = "WhitelistBypass"
+    const val SESSION_NAME = "VConnect"
 }
