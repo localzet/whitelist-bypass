@@ -1,9 +1,12 @@
 package controlplane
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalizePlatform(t *testing.T) {
@@ -57,5 +60,21 @@ func TestResolveBinary(t *testing.T) {
 func TestCreatorBinaryRejectsUnsupportedPlatform(t *testing.T) {
 	if _, err := creatorBinary("unknown"); err == nil {
 		t.Fatal("creatorBinary() expected unsupported platform error")
+	}
+}
+
+func TestWaitForFirstLineReturnsWhenCreatorExits(t *testing.T) {
+	done := make(chan error, 1)
+	done <- os.ErrPermission
+	started := time.Now()
+	_, err := waitForFirstLine(context.Background(), filepath.Join(t.TempDir(), "missing.txt"), time.Minute, done)
+	if err == nil {
+		t.Fatal("waitForFirstLine() expected process exit error")
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("waitForFirstLine() waited for timeout after process exit")
+	}
+	if !strings.Contains(err.Error(), "creator exited before writing link") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

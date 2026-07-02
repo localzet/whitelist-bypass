@@ -444,7 +444,6 @@ func (b *Bridge) handleMessage(raw []byte) {
 
 	if sc, ok := msg["slotsConfig"]; ok {
 		log.Printf("[tm-ws] <- slotsConfig %s", tmapi.BriefJSON(sc))
-		needRebind := false
 		presentPids := make(map[string]bool)
 		for _, ev := range tmapi.SlotsConfigBindings(sc) {
 			fullPid := ev.ParticipantID
@@ -476,8 +475,7 @@ func (b *Bridge) handleMessage(raw []byte) {
 				}
 				b.mu.Unlock()
 				if wasBound {
-					log.Printf("[bind] KILL slot=%d pid=%s reason=%s - rebinding", ev.Slot, pid, ev.Reason)
-					needRebind = true
+					log.Printf("[bind] TRANSIENT slot=%d pid=%s reason=%s mid=%q", ev.Slot, pid, ev.Reason, ev.Mid)
 				} else {
 					log.Printf("[bind] UNBOUND slot=%d pid=%s reason=%s mid=%q", ev.Slot, pid, ev.Reason, ev.Mid)
 				}
@@ -490,15 +488,11 @@ func (b *Bridge) handleMessage(raw []byte) {
 				if len(short) > 8 {
 					short = short[:8]
 				}
-				log.Printf("[bind] VANISHED pid=%s - rebinding", short)
+				log.Printf("[bind] VANISHED pid=%s", short)
 				delete(b.boundPeers, boundPid)
-				needRebind = true
 			}
 		}
 		b.mu.Unlock()
-		if needRebind {
-			go b.forceReconnect("slot binding killed")
-		}
 		b.ack(uid)
 		return
 	}

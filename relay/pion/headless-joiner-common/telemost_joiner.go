@@ -38,11 +38,11 @@ type TelemostHeadlessJoiner struct {
 	// joiner uses these to install /32 bypass routes before the
 	// candidate is added to Pion's PeerConnection.
 	OnRemoteCandidate func(target int, candidateOrSDP string)
-	ResolveFn      ResolveFunc
-	Status         StatusEmitter
-	PCConfig       PeerConnectionConfigurer
-	AddTracks      AddTunnelTracksFunc
-	ReadTrackFn    ReadTrackFunc
+	ResolveFn         ResolveFunc
+	Status            StatusEmitter
+	PCConfig          PeerConnectionConfigurer
+	AddTracks         AddTunnelTracksFunc
+	ReadTrackFn       ReadTrackFunc
 
 	joinLink    string
 	displayName string
@@ -84,11 +84,11 @@ type TelemostHeadlessJoiner struct {
 	stopOnce         sync.Once
 	reconnectAttempt atomic.Int32
 
-	setSlotsKey     int
-	initBundleSent  bool
-	boundPeers      map[string]bool
-	unboundPeers    map[string]bool
-	boundMu         sync.Mutex
+	setSlotsKey    int
+	initBundleSent bool
+	boundPeers     map[string]bool
+	unboundPeers   map[string]bool
+	boundMu        sync.Mutex
 }
 
 func NewTelemostHeadlessJoiner(logFn func(string, ...any), resolveFn ResolveFunc, status StatusEmitter, pcConfig PeerConnectionConfigurer, addTracks AddTunnelTracksFunc, readTrackFn ReadTrackFunc) *TelemostHeadlessJoiner {
@@ -394,13 +394,13 @@ func (j *TelemostHeadlessJoiner) sendHello() {
 		"hello": map[string]interface{}{
 			"participantMeta":       map[string]interface{}{"name": j.displayName, "role": "SPEAKER", "description": "", "sendAudio": false, "sendVideo": true},
 			"participantAttributes": map[string]interface{}{"name": j.displayName, "role": "SPEAKER", "description": ""},
-			"sendAudio": false, "sendVideo": true, "sendSharing": false,
+			"sendAudio":             false, "sendVideo": true, "sendSharing": false,
 			"participantId": j.peerID, "roomId": j.roomID,
 			"serviceName": j.serviceName, "credentials": j.credentials,
-			"capabilitiesOffer": tmapi.CapabilitiesOffer,
+			"capabilitiesOffer":   tmapi.CapabilitiesOffer,
 			"sdkInfo":             map[string]interface{}{"implementation": "browser", "version": "6.0.0", "userAgent": common.UserAgent, "hwConcurrency": 8},
 			"sdkInitializationId": uuid.New().String(),
-			"disablePublisher": false, "disableSubscriber": false, "disableSubscriberAudio": false,
+			"disablePublisher":    false, "disableSubscriber": false, "disableSubscriberAudio": false,
 		},
 	})
 	j.logFn("telemost-joiner: -> hello")
@@ -754,7 +754,6 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 
 	if sc, ok := msg["slotsConfig"]; ok {
 		j.logFn("telemost-joiner: <- slotsConfig %s", tmapi.BriefJSON(sc))
-		needRebind := false
 		presentPids := make(map[string]bool)
 		for _, ev := range tmapi.SlotsConfigBindings(sc) {
 			fullPid := ev.ParticipantID
@@ -786,8 +785,7 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 				}
 				j.boundMu.Unlock()
 				if wasBound {
-					j.logFn("telemost-joiner: [bind] KILL slot=%d pid=%s reason=%s - rebinding", ev.Slot, pid, ev.Reason)
-					needRebind = true
+					j.logFn("telemost-joiner: [bind] TRANSIENT slot=%d pid=%s reason=%s mid=%q", ev.Slot, pid, ev.Reason, ev.Mid)
 				} else {
 					j.logFn("telemost-joiner: [bind] UNBOUND slot=%d pid=%s reason=%s mid=%q", ev.Slot, pid, ev.Reason, ev.Mid)
 				}
@@ -800,15 +798,11 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 				if len(short) > 8 {
 					short = short[:8]
 				}
-				j.logFn("telemost-joiner: [bind] VANISHED pid=%s - rebinding", short)
+				j.logFn("telemost-joiner: [bind] VANISHED pid=%s", short)
 				delete(j.boundPeers, boundPid)
-				needRebind = true
 			}
 		}
 		j.boundMu.Unlock()
-		if needRebind {
-			go j.forceReconnect("slot binding killed")
-		}
 		j.ack(uid)
 		return
 	}

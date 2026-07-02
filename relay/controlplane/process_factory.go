@@ -127,16 +127,38 @@ func (f *ProcessWorkCallFactory) CreateWorkCall(ctx context.Context, request Wor
 	if err := cmd.Start(); err != nil {
 		return WorkCall{}, err
 	}
-	link, err := waitForFirstLine(ctx, linkPath, f.cfg.SpawnTimeout)
+	waitCh := make(chan error, 1)
+	go func() {
+		waitCh <- cmd.Wait()
+	}()
+	link, err := waitForFirstLine(ctx, linkPath, f.cfg.SpawnTimeout, waitCh)
 	if err != nil {
-		_ = cmd.Process.Kill()
-		_ = cmd.Wait()
-		return WorkCall{}, err
+		if cmd.ProcessState == nil {
+			_ = cmd.Process.Kill()
+			<-waitCh
+		}
+		return WorkCall{}, fmt.Errorf("%w (log: %s)", err, logPath)
+	}
+	if cmd.ProcessState != nil {
+		return WorkCall{}, fmt.Errorf("controlplane: creator exited after writing link (log: %s)", logPath)
+	}
+	select {
+	case err := <-waitCh:
+		if err != nil {
+			return WorkCall{}, fmt.Errorf("controlplane: creator exited after writing link: %w (log: %s)", err, logPath)
+		}
+		return WorkCall{}, fmt.Errorf("controlplane: creator exited after writing link (log: %s)", logPath)
+	default:
 	}
 	f.mu.Lock()
 	f.processes[link] = cmd
 	f.mu.Unlock()
-	go cmd.Wait()
+	go func() {
+		if err := <-waitCh; err != nil {
+			// The process may be killed during normal session cleanup.
+			return
+		}
+	}()
 	return WorkCall{JoinLink: link}, nil
 }
 
@@ -204,7 +226,7 @@ func resolveBinary(dir, name string) (string, error) {
 	return "", fmt.Errorf("controlplane: binary %s not found in %s", name, dir)
 }
 
-func waitForFirstLine(ctx context.Context, path string, timeout time.Duration) (string, error) {
+func waitForFirstLine(ctx context.Context, path string, timeout time.Duration, processDone <-chan error) (string, error) {
 	deadline := time.NewTimer(timeout)
 	defer deadline.Stop()
 	ticker := time.NewTicker(500 * time.Millisecond)
@@ -213,6 +235,11 @@ func waitForFirstLine(ctx context.Context, path string, timeout time.Duration) (
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
+		case err := <-processDone:
+			if err != nil {
+				return "", fmt.Errorf("controlplane: creator exited before writing link: %w", err)
+			}
+			return "", errors.New("controlplane: creator exited before writing link")
 		case <-deadline.C:
 			return "", fmt.Errorf("controlplane: creator did not write link within %s", timeout)
 		case <-ticker.C:
