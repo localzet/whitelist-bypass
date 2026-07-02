@@ -11,6 +11,11 @@ export PATH="$PATH:/opt/homebrew/bin:$HOME/go/bin"
 if [ -z "${GOMOBILE_LDFLAGS:-}" ]; then
     GOMOBILE_LDFLAGS="-s -w -checklinkname=0"
 fi
+VERSION_LDFLAGS="-s -w"
+if [ -n "${RELEASE_VERSION:-}" ]; then
+    VERSION_LDFLAGS="$VERSION_LDFLAGS -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
+    GOMOBILE_LDFLAGS="$GOMOBILE_LDFLAGS -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
+fi
 
 # Check deps
 command -v go >/dev/null || { echo "go not found"; exit 1; }
@@ -29,27 +34,27 @@ mkdir -p ../android-app/app/libs
 cp mobile.aar ../android-app/app/libs/mobile.aar
 
 echo "Building Pion relay for Android..."
-GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o ../android-app/app/src/main/jniLibs/arm64-v8a/librelay.so .
-GOOS=linux GOARCH=arm go build -trimpath -ldflags="-s -w" -o ../android-app/app/src/main/jniLibs/armeabi-v7a/librelay.so .
+GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="$VERSION_LDFLAGS" -o ../android-app/app/src/main/jniLibs/arm64-v8a/librelay.so .
+GOOS=linux GOARCH=arm go build -trimpath -ldflags="$VERSION_LDFLAGS" -o ../android-app/app/src/main/jniLibs/armeabi-v7a/librelay.so .
 echo "Pion relay built"
 
 echo "Done. .aar size: $(du -h mobile.aar | cut -f1)"
 
 echo ""
 echo "Building desktop relay..."
-go -C "$ROOT/relay" build -trimpath -ldflags="-s -w" -o relay .
+go -C "$ROOT/relay" build -trimpath -ldflags="$VERSION_LDFLAGS" -o relay .
 
 echo "Building headless-vk-creator..."
-go -C "$ROOT/headless/vk" build -trimpath -ldflags="-s -w" -o headless-vk-creator .
+go -C "$ROOT/headless/vk" build -trimpath -ldflags="$VERSION_LDFLAGS" -o headless-vk-creator .
 
 echo "Building headless-telemost-creator-creator..."
-go -C "$ROOT/headless/telemost" build -trimpath -ldflags="-s -w" -o headless-telemost-creator .
+go -C "$ROOT/headless/telemost" build -trimpath -ldflags="$VERSION_LDFLAGS" -o headless-telemost-creator .
 
 echo "Building headless-wbstream-creator..."
-go -C "$ROOT/headless/wbstream" build -trimpath -ldflags="-s -w" -o headless-wbstream-creator .
+go -C "$ROOT/headless/wbstream" build -trimpath -ldflags="$VERSION_LDFLAGS" -o headless-wbstream-creator .
 
 echo "Building headless-dion-creator..."
-go -C "$ROOT/headless/dion" build -trimpath -ldflags="-s -w" -o headless-dion-creator .
+go -C "$ROOT/headless/dion" build -trimpath -ldflags="$VERSION_LDFLAGS" -o headless-dion-creator .
 
 echo "Done."
 ls -lh "$ROOT/relay/relay" "$ROOT/headless/vk/headless-vk-creator" "$ROOT/headless/telemost/headless-telemost-creator" "$ROOT/headless/wbstream/headless-wbstream-creator" "$ROOT/headless/dion/headless-dion-creator"

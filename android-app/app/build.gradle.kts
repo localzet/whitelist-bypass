@@ -3,10 +3,16 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
-val versionMajor = 0
-val versionMinor = 3
-val versionPatch = 7
-val versionBuild = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 0
+val releaseVersion = System.getenv("RELEASE_VERSION") ?: "0.3.7"
+val versionParts = releaseVersion.split('.')
+require(versionParts.size == 3 && versionParts.all { part -> part.toIntOrNull() != null }) {
+    "RELEASE_VERSION must use MAJOR.MINOR.PATCH format"
+}
+val (versionMajor, versionMinor, versionPatch) = versionParts.map(String::toInt)
+require(versionMajor <= 210 && versionMinor <= 99 && versionPatch <= 99) {
+    "RELEASE_VERSION exceeds Android versionCode limits"
+}
+val versionBuild = (System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 0).coerceIn(0, 999)
 
 android {
     namespace = "bypass.whitelist"
@@ -18,8 +24,8 @@ android {
         applicationId = "bypass.whitelist"
         minSdk = 23
         targetSdk = 36
-        versionCode = 1_000_000 * versionMajor + 1_000 * versionMinor + versionPatch + versionBuild
-        versionName = "$versionMajor.$versionMinor.$versionPatch"
+        versionCode = 10_000_000 * versionMajor + 100_000 * versionMinor + 1_000 * versionPatch + versionBuild
+        versionName = releaseVersion
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

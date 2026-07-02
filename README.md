@@ -127,6 +127,10 @@ This builds `Mobile.xcframework` into `ios-proxy-app/`. Then open `ios-proxy-app
 
 Before committing, run `ios-proxy-app/strip-signing.sh` to remove your Apple developer team ID from the project.
 
+### Release versions
+
+Push a strict SemVer tag such as `v1.2.3` to start the release workflow. The workflow propagates `1.2.3` to Android, iOS, Creator, Joiner and Go CLI metadata automatically. Manual workflow runs must provide the same tag format.
+
 Output in `prebuilts/`:
 
 | File | Platform |

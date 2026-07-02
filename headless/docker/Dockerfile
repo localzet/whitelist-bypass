@@ -1,18 +1,20 @@
 FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS build
 ARG TARGETOS
 ARG TARGETARCH
+ARG RELEASE_VERSION=0.3.7
 ENV CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH
 WORKDIR /src
 
 COPY relay /src/relay
 COPY headless /src/headless
 
-RUN go -C /src/headless/vk        build -trimpath -ldflags="-s -w" -o /out/headless-vk-creator . \
- && go -C /src/headless/telemost  build -trimpath -ldflags="-s -w" -o /out/headless-telemost-creator . \
- && go -C /src/headless/wbstream  build -trimpath -ldflags="-s -w" -o /out/headless-wbstream-creator . \
- && go -C /src/headless/dion      build -trimpath -ldflags="-s -w" -o /out/headless-dion-creator . \
- && go -C /src/headless/creator-service build -trimpath -ldflags="-s -w" -o /out/headless-creator-service . \
- && go -C /src/headless/vk-bot    build -trimpath -ldflags="-s -w" -o /out/headless-vk-bot .
+RUN LDFLAGS="-s -w -X whitelist-bypass/relay/common.Version=${RELEASE_VERSION}" \
+ && go -C /src/headless/vk        build -trimpath -ldflags="$LDFLAGS" -o /out/headless-vk-creator . \
+ && go -C /src/headless/telemost  build -trimpath -ldflags="$LDFLAGS" -o /out/headless-telemost-creator . \
+ && go -C /src/headless/wbstream  build -trimpath -ldflags="$LDFLAGS" -o /out/headless-wbstream-creator . \
+ && go -C /src/headless/dion      build -trimpath -ldflags="$LDFLAGS" -o /out/headless-dion-creator . \
+ && go -C /src/headless/creator-service build -trimpath -ldflags="$LDFLAGS" -o /out/headless-creator-service . \
+ && go -C /src/headless/vk-bot    build -trimpath -ldflags="$LDFLAGS" -o /out/headless-vk-bot .
 
 FROM debian:bookworm-slim
 RUN apt-get update \

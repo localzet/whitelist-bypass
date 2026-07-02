@@ -5,6 +5,7 @@ export PATH="$PATH:/opt/homebrew/bin:$HOME/go/bin"
 if [ -z "${GOMOBILE_LDFLAGS:-}" ]; then
     GOMOBILE_LDFLAGS="-s -w -checklinkname=0"
 fi
+[ -n "${RELEASE_VERSION:-}" ] && GOMOBILE_LDFLAGS="$GOMOBILE_LDFLAGS -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
 
 command -v go >/dev/null || { echo "go not found"; exit 1; }
 command -v gomobile >/dev/null || { echo "gomobile not found, run: go install golang.org/x/mobile/cmd/gomobile@latest"; exit 1; }
@@ -37,6 +38,8 @@ xcodebuild \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
     CODE_SIGN_IDENTITY="" \
+    MARKETING_VERSION="${RELEASE_VERSION:-0.3.7}" \
+    CURRENT_PROJECT_VERSION="${BUILD_NUMBER:-1}" \
     build
 
 echo "Packaging unsigned IPA..."

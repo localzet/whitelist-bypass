@@ -8,7 +8,7 @@ on:
     inputs:
       tag:
         description: 'Release tag to attach artifacts to, for example v0.3.8'
-        required: false
+        required: true
         type: string
       draft:
         description: 'Create or update the release as draft'
@@ -29,6 +29,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
   GO_VERSION: '1.26.1'
   NODE_VERSION: '22'
   JAVA_VERSION: '17'
@@ -40,6 +41,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve release version
+        run: sh ./.github/scripts/export-release-version.sh
 
       - uses: actions/setup-go@v5
         with:
@@ -87,6 +91,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve release version
+        run: sh ./.github/scripts/export-release-version.sh
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -132,6 +139,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve release version
+        shell: bash
+        run: sh ./.github/scripts/export-release-version.sh
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -151,9 +162,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C relay build -trimpath -ldflags="-s -w" -o "relay-bundle${{ matrix.ext }}" .
+          VERSION_LDFLAGS="-s -w -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C relay build -trimpath -ldflags="$VERSION_LDFLAGS" -o "relay-bundle${{ matrix.ext }}" .
           for component in vk telemost wbstream dion; do
-            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C "headless/$component" build -trimpath -ldflags="-s -w" -o "../headless-$component-bundle${{ matrix.ext }}" .
+            GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C "headless/$component" build -trimpath -ldflags="$VERSION_LDFLAGS" -o "../headless-$component-bundle${{ matrix.ext }}" .
           done
 
       - name: Build Creator installer
@@ -161,6 +173,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --prefix creator-app
+          npm version --prefix creator-app --no-git-tag-version "$RELEASE_VERSION"
           npm run build --prefix creator-app
           cd creator-app
           npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
@@ -205,6 +218,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve release version
+        shell: bash
+        run: sh ./.github/scripts/export-release-version.sh
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -225,7 +242,7 @@ jobs:
         run: |
           set -euo pipefail
           cd joiner-desktop-app/desktop-joiner
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags="-s -w" -o "desktop-joiner-bundle${{ matrix.ext }}" .
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags="-s -w -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION" -o "desktop-joiner-bundle${{ matrix.ext }}" .
           if [ "${{ matrix.platform }}" = "win" ]; then
             curl -L -o wintun.zip https://www.wintun.net/builds/wintun-0.14.1.zip
             7z e -y wintun.zip "wintun/bin/${{ matrix.wintun_arch }}/wintun.dll" >/dev/null
@@ -239,6 +256,7 @@ jobs:
         run: |
           set -euo pipefail
           npm ci --prefix joiner-desktop-app
+          npm version --prefix joiner-desktop-app --no-git-tag-version "$RELEASE_VERSION"
           npm run build --prefix joiner-desktop-app
           cd joiner-desktop-app
           npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
@@ -258,6 +276,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve release version
+        run: sh ./.github/scripts/export-release-version.sh
 
       - uses: actions/setup-go@v5
         with:

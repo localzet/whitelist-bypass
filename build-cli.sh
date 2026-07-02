@@ -9,6 +9,8 @@ set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 HEADLESS="$ROOT/headless"
 PREBUILTS="$ROOT/prebuilts"
+VERSION_LDFLAGS="-s -w"
+[ -n "${RELEASE_VERSION:-}" ] && VERSION_LDFLAGS="$VERSION_LDFLAGS -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
 mkdir -p "$PREBUILTS"
 
 # entry format is sourceDir:outputBinaryName
@@ -37,7 +39,7 @@ build_target() {
         dir=${entry%%:*}
         bin=${entry##*:}
         echo "  $bin"
-        env GOOS="$goos" GOARCH="$goarch" go -C "$HEADLESS/$dir" build -trimpath -ldflags="-s -w" -o "$stage/$bin" .
+        env GOOS="$goos" GOARCH="$goarch" go -C "$HEADLESS/$dir" build -trimpath -ldflags="$VERSION_LDFLAGS" -o "$stage/$bin" .
     done
 
     ( cd "$stage" && zip -q -j "$zip_path" ./* )
@@ -62,7 +64,7 @@ build_bundle() {
             dir=${entry%%:*}
             bin=${entry##*:}
             echo "  $goarch/$bin"
-            env GOOS=linux GOARCH="$goarch" $float_env go -C "$HEADLESS/$dir" build -trimpath -ldflags="-s -w" -o "$archdir/$bin" .
+            env GOOS=linux GOARCH="$goarch" $float_env go -C "$HEADLESS/$dir" build -trimpath -ldflags="$VERSION_LDFLAGS" -o "$archdir/$bin" .
         done
     done
 
