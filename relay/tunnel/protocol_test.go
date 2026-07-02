@@ -3,15 +3,24 @@ package tunnel
 import "testing"
 
 func TestEgressDiscoveryPayloads(t *testing.T) {
+	request, ok := DecodeEgressListRequest(EncodeEgressListRequestPayload("user-1"))
+	if !ok || request.UserID != "user-1" {
+		t.Fatalf("egress list request round trip = %+v, %v", request, ok)
+	}
+	emptyRequest, ok := DecodeEgressListRequest(nil)
+	if !ok || emptyRequest.UserID != "" {
+		t.Fatalf("empty egress list request = %+v, %v", emptyRequest, ok)
+	}
+
 	want := []EgressDescriptor{{ID: "ee", IsDefault: true}, {ID: "fi"}}
 	list, ok := DecodeEgressList(EncodeEgressListPayload(want))
 	if !ok || len(list.Egresses) != 2 || list.Egresses[0] != want[0] || list.Egresses[1] != want[1] {
 		t.Fatalf("egress list round trip = %+v, %v", list, ok)
 	}
 
-	request, ok := DecodeEgressProbeRequest(EncodeEgressProbeRequestPayload("fi"))
-	if !ok || request.ID != "fi" {
-		t.Fatalf("probe request round trip = %+v, %v", request, ok)
+	probeRequest, ok := DecodeEgressProbeRequest(EncodeEgressProbeRequestPayload("fi"))
+	if !ok || probeRequest.ID != "fi" {
+		t.Fatalf("probe request round trip = %+v, %v", probeRequest, ok)
 	}
 
 	wantResult := EgressProbeResult{ID: "fi", Available: true, LatencyMS: 42}

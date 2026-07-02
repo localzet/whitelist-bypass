@@ -22,6 +22,7 @@ class HeadlessRelayController(
     private val onCaptchaUrl: ParamCallback<String>? = null,
     private val serviceControl: ServiceControlConfig? = null,
     private val onServiceSessionReady: ParamCallback<ServiceSessionReady>? = null,
+    private val onEgressDiscoveryChanged: ParamCallback<List<EgressProfileStatus>>? = null,
 ) {
     private var process: Process? = null
     private var thread: Thread? = null
@@ -124,7 +125,9 @@ class HeadlessRelayController(
                         }
                     } else {
                         Log.d("RELAY", line)
-                        EgressDiscovery.consume(line)
+                        if (EgressDiscovery.consume(line)) {
+                            onEgressDiscoveryChanged?.invoke(EgressDiscovery.snapshot())
+                        }
                         onLog.invoke(line)
                     }
                 }
@@ -159,6 +162,10 @@ class HeadlessRelayController(
             put("dualTrack", Prefs.activeDualTrack)
         }
         writeStdin("AUTH:$json")
+    }
+
+    fun requestServiceSession(egressId: String) {
+        writeStdin("SERVICE_EGRESS:$egressId")
     }
 
     @Synchronized

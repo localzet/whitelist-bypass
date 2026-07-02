@@ -3,6 +3,14 @@ package bypass.whitelist.tunnel
 import bypass.whitelist.util.Prefs
 import org.json.JSONObject
 
+data class EgressProfileStatus(
+    val id: String,
+    val isDefault: Boolean,
+    val available: Boolean?,
+    val latencyMs: Long?,
+    val error: String?,
+)
+
 object EgressDiscovery {
     private const val LIST_MARKER = "EGRESS_LIST:"
     private const val PROBE_MARKER = "EGRESS_PROBE:"
@@ -35,23 +43,35 @@ object EgressDiscovery {
         return false
     }
 
-    fun ids(): List<String> = try {
+    fun ids(): List<String> = snapshot().map { it.id }
+
+    fun snapshot(): List<EgressProfileStatus> = try {
         val items = JSONObject(Prefs.discoveredEgressList).getJSONArray("egresses")
-        List(items.length()) { index -> items.getJSONObject(index).getString("id") }
+        val probes = try { JSONObject(Prefs.discoveredEgressProbes) } catch (_: Exception) { JSONObject() }
+        List(items.length()) { index ->
+            val item = items.getJSONObject(index)
+            val id = item.getString("id")
+            val probe = probes.optJSONObject(id)
+            EgressProfileStatus(
+                id = id,
+                isDefault = item.optBoolean("isDefault"),
+                available = probe?.optBoolean("available"),
+                latencyMs = probe?.takeIf { it.has("latencyMs") }?.optLong("latencyMs"),
+                error = probe?.optString("error")?.takeIf { it.isNotBlank() },
+            )
+        }
     } catch (_: Exception) {
         emptyList()
     }
 
     fun summary(): String {
-        val ids = ids()
-        if (ids.isEmpty()) return "Available profiles will appear after connection"
-        val probes = try { JSONObject(Prefs.discoveredEgressProbes) } catch (_: Exception) { JSONObject() }
-        return ids.joinToString(" · ") { id ->
-            val probe = probes.optJSONObject(id)
+        val items = snapshot()
+        if (items.isEmpty()) return "Available profiles will appear after connection"
+        return items.joinToString(" | ") { item ->
             when {
-                probe == null -> "$id: …"
-                probe.optBoolean("available") -> "$id: ${probe.optLong("latencyMs")} ms"
-                else -> "$id: offline"
+                item.available == null -> "${item.id}: ..."
+                item.available -> "${item.id}: ${item.latencyMs ?: 0} ms"
+                else -> "${item.id}: offline"
             }
         }
     }

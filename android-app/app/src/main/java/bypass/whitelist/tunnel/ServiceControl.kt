@@ -10,6 +10,7 @@ data class ServiceControlConfig(
     val requestId: String,
     val egressId: String?,
     val tunnelMode: TunnelMode,
+    val discoveryOnly: Boolean = false,
 ) {
     init {
         require(userId.isNotBlank()) { "Service user ID is required" }
@@ -23,6 +24,7 @@ data class ServiceControlConfig(
         addAll(listOf("--service-work-platform", workPlatform.id))
         addAll(listOf("--service-request-id", requestId))
         addAll(listOf("--service-tunnel-mode", tunnelMode.relayArg))
+        if (discoveryOnly) add("--service-discovery-only")
         cookieFile?.takeIf { it.isNotBlank() }?.let { addAll(listOf("--service-cookie-file", it)) }
         egressId?.takeIf { it.isNotBlank() }?.let { addAll(listOf("--egress-id", it)) }
     }

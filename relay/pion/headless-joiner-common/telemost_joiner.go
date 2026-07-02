@@ -139,29 +139,40 @@ func (j *TelemostHeadlessJoiner) RunWithParams(jsonParams string) {
 		j.joinLink, j.displayName, params.VP8FPS, params.VP8Batch, obf.LocalEpoch())
 
 	j.Status.EmitStatus(common.StatusConnecting)
-	if err := j.runOnce(); err != nil {
-		j.Status.EmitStatusError(err.Error())
-		return
-	}
-
+	connectedOnce := false
 	for {
 		if j.isClosed() {
 			return
 		}
-		j.Status.EmitStatus(common.StatusTunnelLost)
-		j.resetSessionState()
-		if !j.waitBeforeRetry(int(j.reconnectAttempt.Load())) {
-			return
+		attempt := int(j.reconnectAttempt.Load())
+		if connectedOnce || attempt > 0 {
+			if connectedOnce {
+				j.Status.EmitStatus(common.StatusTunnelLost)
+			}
+			j.resetSessionState()
+			backoffAttempt := attempt - 1
+			if backoffAttempt < 0 {
+				backoffAttempt = 0
+			}
+			if !j.waitBeforeRetry(backoffAttempt) {
+				return
+			}
+			if attempt == 0 {
+				attempt = int(j.reconnectAttempt.Add(1))
+			}
+			if j.isClosed() {
+				return
+			}
+			j.logFn("telemost-joiner: reconnect attempt #%d", attempt)
+			j.Status.EmitStatus(common.StatusReconnecting)
 		}
-		j.reconnectAttempt.Add(1)
-		if j.isClosed() {
-			return
-		}
-		j.logFn("telemost-joiner: reconnect attempt #%d", j.reconnectAttempt.Load())
-		j.Status.EmitStatus(common.StatusReconnecting)
 		if err := j.runOnce(); err != nil {
 			j.logFn("telemost-joiner: %v, will retry", err)
+			j.reconnectAttempt.Add(1)
+			continue
 		}
+		connectedOnce = true
+		j.reconnectAttempt.Store(0)
 	}
 }
 

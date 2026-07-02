@@ -18,6 +18,7 @@ import (
 
 const serviceSessionReadyMarker = "SERVICE_SESSION_READY:"
 const serviceControlErrorMarker = "STATUS:ERROR:"
+const serviceSelectEgressCommand = "SERVICE_EGRESS:"
 
 const (
 	serviceSessionRetryInterval = 2 * time.Second
@@ -33,6 +34,7 @@ type serviceControlConfig struct {
 	CookiePlatform string
 	WorkPlatform   string
 	TunnelMode     string
+	DiscoveryOnly  bool
 }
 
 type serviceControlRuntime struct {
@@ -40,6 +42,9 @@ type serviceControlRuntime struct {
 	readyOnce   sync.Once
 	loopRunning atomic.Bool
 	cookieAcked atomic.Bool
+	mu          sync.Mutex
+	bridge      *tunnel.RelayBridge
+	cfg         serviceControlConfig
 }
 
 func newServiceControlRuntime() *serviceControlRuntime {
@@ -59,7 +64,45 @@ func (rt *serviceControlRuntime) markCookieAcked() {
 	}
 }
 
+func (rt *serviceControlRuntime) bind(bridge *tunnel.RelayBridge, cfg serviceControlConfig) {
+	if rt == nil {
+		return
+	}
+	rt.mu.Lock()
+	rt.bridge = bridge
+	rt.cfg = cfg
+	rt.mu.Unlock()
+}
+
+func (rt *serviceControlRuntime) selectEgress(ctx context.Context, egressID string) {
+	if rt == nil {
+		return
+	}
+	egressID = strings.TrimSpace(egressID)
+	if egressID == "" {
+		log.Printf("[service] ignored empty egress selection")
+		return
+	}
+	rt.mu.Lock()
+	bridge := rt.bridge
+	cfg := rt.cfg
+	rt.mu.Unlock()
+	if bridge == nil {
+		log.Printf("[service] egress selection %q ignored: bridge is not ready", egressID)
+		return
+	}
+	cfg.EgressID = egressID
+	cfg.DiscoveryOnly = false
+	log.Printf("[service] selected egress %q; requesting work session", egressID)
+	requestServiceSession(bridge, cfg)
+	rt.startRequestLoop(ctx, bridge, cfg)
+}
+
 func (rt *serviceControlRuntime) startRequestLoop(ctx context.Context, bridge *tunnel.RelayBridge, cfg serviceControlConfig) {
+	if cfg.DiscoveryOnly {
+		log.Printf("[service] discovery-only mode; work session requests are disabled")
+		return
+	}
 	if rt == nil {
 		requestServiceSession(bridge, cfg)
 		return
@@ -121,6 +164,7 @@ func (cfg *serviceControlConfig) normalize() error {
 }
 
 func configureServiceBridge(bridge *tunnel.RelayBridge, cfg serviceControlConfig, rt *serviceControlRuntime, emit func(string)) {
+	bridge.SetEgressDiscoveryUserID(cfg.UserID)
 	bridge.SetOnCookieAck(func(ack tunnel.CookieAck) {
 		log.Printf("[service] cookie stored platform=%q request=%q", ack.Platform, ack.RequestID)
 		rt.markCookieAcked()

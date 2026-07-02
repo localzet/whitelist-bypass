@@ -13,6 +13,7 @@ import (
 type TelemostHeadlessJoiner struct {
 	inner       *joiner.TelemostHeadlessJoiner
 	OnConnected func(tunnel.DataTunnel)
+	OnCommand   func(string)
 }
 
 func NewTelemostHeadlessJoiner(logFn func(string, ...any)) *TelemostHeadlessJoiner {
@@ -38,8 +39,18 @@ func (j *TelemostHeadlessJoiner) Run() {
 			return
 		}
 		if strings.HasPrefix(line, "JOIN:") {
-			j.inner.RunWithParams(strings.TrimPrefix(line, "JOIN:"))
+			go j.inner.RunWithParams(strings.TrimPrefix(line, "JOIN:"))
+			break
+		}
+	}
+	for {
+		line, err := ReadStdinLine()
+		if err != nil {
+			log.Printf("telemost-joiner: stdin closed: %v", err)
 			return
+		}
+		if j.OnCommand != nil {
+			j.OnCommand(line)
 		}
 	}
 }

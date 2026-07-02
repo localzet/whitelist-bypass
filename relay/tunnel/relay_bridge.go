@@ -68,6 +68,9 @@ type RelayBridge struct {
 	handshakeDone     chan struct{}
 	handshakeOnce     sync.Once
 	handshakeErr      atomic.Value
+	clientHelloRetry  atomic.Bool
+	egressListRetry   atomic.Bool
+	egressListReady   atomic.Bool
 
 	persistentListener atomic.Bool
 	listenerMu         sync.Mutex
@@ -86,6 +89,9 @@ type RelayBridge struct {
 	onSessionReadyMu sync.Mutex
 	onSessionReady   func(SessionReady)
 
+	onEgressListRequestMu sync.Mutex
+	onEgressListRequest   func(EgressListRequest) ([]EgressDescriptor, error)
+
 	onCookieSubmitMu sync.Mutex
 	onCookieSubmit   func(CookieSubmit) (CookieAck, error)
 
@@ -94,6 +100,8 @@ type RelayBridge struct {
 
 	onControlErrorMu sync.Mutex
 	onControlError   func(ControlError)
+
+	egressDiscoveryUserID string
 }
 
 func (rb *RelayBridge) SetOnPeerConfig(fn func(fps, batch, trackCount int)) {
@@ -118,6 +126,18 @@ func (rb *RelayBridge) SetOnSessionReady(fn func(SessionReady)) {
 	rb.onSessionReadyMu.Lock()
 	rb.onSessionReady = fn
 	rb.onSessionReadyMu.Unlock()
+}
+
+func (rb *RelayBridge) SetOnEgressListRequest(fn func(EgressListRequest) ([]EgressDescriptor, error)) {
+	rb.onEgressListRequestMu.Lock()
+	rb.onEgressListRequest = fn
+	rb.onEgressListRequestMu.Unlock()
+}
+
+func (rb *RelayBridge) SetEgressDiscoveryUserID(userID string) {
+	rb.egressMu.Lock()
+	rb.egressDiscoveryUserID = strings.TrimSpace(userID)
+	rb.egressMu.Unlock()
 }
 
 func (rb *RelayBridge) RequestSession(request SessionCreateRequest) {
@@ -215,7 +235,9 @@ func (rb *RelayBridge) SwapTunnel(newTunnel DataTunnel) {
 	newTunnel.SetOnClose(rb.handleTunnelClose)
 	rb.closeAll()
 	if rb.mode == "joiner" {
+		rb.egressListReady.Store(false)
 		rb.sendClientHello()
+		rb.startClientHelloRetry()
 	}
 }
 
@@ -299,6 +321,7 @@ func (rb *RelayBridge) Stats() (tcpConns, udpConns int, nextID uint32) {
 func (rb *RelayBridge) MarkReady() {
 	if rb.mode == "joiner" {
 		rb.sendClientHello()
+		rb.startClientHelloRetry()
 	}
 	rb.once.Do(func() { close(rb.ready) })
 }
@@ -312,10 +335,67 @@ func (rb *RelayBridge) sendClientHello() {
 	}
 }
 
+func (rb *RelayBridge) startClientHelloRetry() {
+	if rb.mode != "joiner" || !rb.clientHelloRetry.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		defer rb.clientHelloRetry.Store(false)
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for attempt := 1; attempt <= 12; attempt++ {
+			select {
+			case <-rb.handshakeDone:
+				return
+			case <-ticker.C:
+				if rb.closed.Load() {
+					return
+				}
+				rb.logFn("relay: retrying ClientHello attempt=%d", attempt)
+				rb.sendClientHello()
+			}
+		}
+	}()
+}
+
+func (rb *RelayBridge) sendEgressListRequest() {
+	rb.send(ControlConnID, MsgEgressListRequest, EncodeEgressListRequestPayload(rb.egressDiscoveryUser()))
+}
+
+func (rb *RelayBridge) startEgressListRetry() {
+	if rb.mode != "joiner" || !rb.egressListRetry.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		defer rb.egressListRetry.Store(false)
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for attempt := 1; attempt <= 8; attempt++ {
+			if rb.egressListReady.Load() || rb.closed.Load() {
+				return
+			}
+			select {
+			case <-ticker.C:
+				if rb.egressListReady.Load() || rb.closed.Load() {
+					return
+				}
+				rb.logFn("relay: retrying EgressListRequest attempt=%d", attempt)
+				rb.sendEgressListRequest()
+			}
+		}
+	}()
+}
+
 func (rb *RelayBridge) requestedEgress() string {
 	rb.egressMu.RLock()
 	defer rb.egressMu.RUnlock()
 	return rb.requestedEgressID
+}
+
+func (rb *RelayBridge) egressDiscoveryUser() string {
+	rb.egressMu.RLock()
+	defer rb.egressMu.RUnlock()
+	return rb.egressDiscoveryUserID
 }
 
 func (rb *RelayBridge) currentEgressRegistry() *egress.Registry {
@@ -447,7 +527,8 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 				rb.egressMu.Unlock()
 				rb.logFn("relay: server selected egress %q", hello.SelectedEgressID)
 				rb.markHandshakeDone()
-				rb.send(ControlConnID, MsgEgressListRequest, nil)
+				rb.sendEgressListRequest()
+				rb.startEgressListRetry()
 			}
 			return
 		}
@@ -471,10 +552,32 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 		}
 		if connID == ControlConnID && msgType == MsgEgressListRequest {
 			if rb.mode == "creator" {
-				descriptors := rb.currentEgressRegistry().Descriptors()
-				items := make([]EgressDescriptor, 0, len(descriptors))
-				for _, descriptor := range descriptors {
-					items = append(items, EgressDescriptor{ID: descriptor.ID, IsDefault: descriptor.IsDefault})
+				request, ok := DecodeEgressListRequest(payload)
+				if !ok {
+					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("bad_egress_list_request", "invalid egress list request"))
+					return
+				}
+				rb.onEgressListRequestMu.Lock()
+				cb := rb.onEgressListRequest
+				rb.onEgressListRequestMu.Unlock()
+				var (
+					items []EgressDescriptor
+					err   error
+				)
+				if cb != nil {
+					items, err = cb(request)
+					if err != nil {
+						rb.logFn("relay: egress list request failed: %v", err)
+						rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("egress_list_unavailable", common.MaskError(err)))
+						return
+					}
+				}
+				if items == nil {
+					descriptors := rb.currentEgressRegistry().Descriptors()
+					items = make([]EgressDescriptor, 0, len(descriptors))
+					for _, descriptor := range descriptors {
+						items = append(items, EgressDescriptor{ID: descriptor.ID, IsDefault: descriptor.IsDefault})
+					}
 				}
 				rb.send(ControlConnID, MsgEgressList, EncodeEgressListPayload(items))
 			}
@@ -488,6 +591,7 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 					return
 				}
 				rb.logFn("EGRESS_LIST:%s", payload)
+				rb.egressListReady.Store(true)
 				for _, descriptor := range list.Egresses {
 					rb.send(ControlConnID, MsgEgressProbeRequest, EncodeEgressProbeRequestPayload(descriptor.ID))
 				}

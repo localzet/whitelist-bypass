@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"whitelist-bypass/relay/androidbind"
@@ -42,6 +43,7 @@ func main() {
 	serviceWorkPlatform := flag.String("service-work-platform", "telemost", "platform requested for the work call")
 	serviceRequestID := flag.String("service-request-id", "", "idempotency key for the service session request")
 	serviceTunnelMode := flag.String("service-tunnel-mode", "video", "tunnel mode requested for the work call")
+	serviceDiscoveryOnly := flag.Bool("service-discovery-only", false, "use service call only to discover egress profiles")
 	flag.String("local-ip", "", "local IP address (unused, passed via hook)")
 	flag.Parse()
 
@@ -58,9 +60,14 @@ func main() {
 		CookiePlatform: *serviceCookiePlatform,
 		WorkPlatform:   *serviceWorkPlatform,
 		TunnelMode:     *serviceTunnelMode,
+		DiscoveryOnly:  *serviceDiscoveryOnly,
 	}
 	if err := serviceCfg.normalize(); err != nil {
 		log.Fatalf("[config] %v", err)
+	}
+	var serviceRuntime *serviceControlRuntime
+	if serviceCfg.Enabled {
+		serviceRuntime = newServiceControlRuntime()
 	}
 	egressRegistry := loadEgressRegistry(*egressConfig, *upstreamSocks, *upstreamUser, *upstreamPass)
 
@@ -99,10 +106,6 @@ func main() {
 			bridge   *tunnel.RelayBridge
 			bridgeMu sync.Mutex
 		)
-		var serviceRuntime *serviceControlRuntime
-		if serviceCfg.Enabled {
-			serviceRuntime = newServiceControlRuntime()
-		}
 		return func(tun tunnel.DataTunnel) {
 			readBuf := common.VP8BufSize
 			if _, ok := tun.(*tunnel.DCTunnel); ok {
@@ -114,6 +117,7 @@ func main() {
 				if serviceCfg.Enabled {
 					bridge = tunnel.NewRelayBridge(tun, "joiner", readBuf, log.Printf)
 					configureServiceBridge(bridge, serviceCfg, serviceRuntime, func(line string) { fmt.Println(line) })
+					serviceRuntime.bind(bridge, serviceCfg)
 				} else {
 					bridge = tunnel.NewRelayBridgeWithAuth(tun, "joiner", readBuf, log.Printf, *socksUser, *socksPass)
 					bridge.SetRequestedEgressID(*egressID)
@@ -140,6 +144,7 @@ func main() {
 				bridge.SetOnConfigAck(onConfigAck)
 			}
 			if serviceCfg.Enabled {
+				serviceRuntime.bind(bridge, serviceCfg)
 				serviceRuntime.startRequestLoop(context.Background(), bridge, serviceCfg)
 			}
 			log.Printf("relay: tunnel swapped after reconnect")
@@ -166,6 +171,13 @@ func main() {
 	case "telemost-headless-joiner":
 		c := android.NewTelemostHeadlessJoiner(log.Printf)
 		c.OnConnected = newPersistentJoinerBridge(nil)
+		if serviceCfg.Enabled {
+			c.OnCommand = func(line string) {
+				if strings.HasPrefix(line, serviceSelectEgressCommand) {
+					serviceRuntime.selectEgress(context.Background(), strings.TrimPrefix(line, serviceSelectEgressCommand))
+				}
+			}
+		}
 		c.Run()
 	case "telemost-video-joiner":
 		c := pion.NewTelemostClient(log.Printf)

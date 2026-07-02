@@ -45,6 +45,12 @@ func (h ServiceHandler) BindBridge(ctx context.Context, bridge *tunnel.RelayBrid
 			return h.Sessions.HandleSessionCreate(ctx, userID, request)
 		})
 	}
+	bridge.SetOnEgressListRequest(func(request tunnel.EgressListRequest) ([]tunnel.EgressDescriptor, error) {
+		if _, err := h.authorizeUser(request.UserID); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	})
 	return nil
 }
 

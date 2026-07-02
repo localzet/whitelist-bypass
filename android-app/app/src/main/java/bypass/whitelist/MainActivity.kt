@@ -26,6 +26,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
 import bypass.whitelist.tunnel.CallConfig
 import bypass.whitelist.tunnel.CallPlatform
+import bypass.whitelist.tunnel.EgressProfileStatus
 import bypass.whitelist.tunnel.HeadlessJoinController
 import bypass.whitelist.tunnel.JoinController
 import bypass.whitelist.tunnel.ServiceJoinController
@@ -37,6 +38,7 @@ import bypass.whitelist.tunnel.TunnelServiceState
 import bypass.whitelist.tunnel.TunnelVpnService
 import bypass.whitelist.tunnel.VpnStatus
 import bypass.whitelist.ui.CallsListener
+import bypass.whitelist.ui.ChoiceActionSheet
 import bypass.whitelist.ui.HeadlessVkFragment
 import bypass.whitelist.ui.JoinFragmentHost
 import bypass.whitelist.ui.JoinSessionShutdown
@@ -53,6 +55,7 @@ import bypass.whitelist.util.SocksAuth
 import bypass.whitelist.util.maskUrl
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 class MainActivity :
@@ -702,6 +705,11 @@ class MainActivity :
         mainFragment()?.onStatusChanged(VpnStatus.CONNECTING)
         mainFragment()?.onConnectedChanged(false)
 
+        if (config.serviceControl && config.egressId.isNullOrBlank()) {
+            startServiceEgressDiscovery(config)
+            return
+        }
+
         val headlessMode = config.serviceControl ||
             Prefs.headless || platform == CallPlatform.WBSTREAM || platform == CallPlatform.DION
 
@@ -731,6 +739,66 @@ class MainActivity :
         supportFragmentManager.beginTransaction()
             .replace(R.id.joinOverlayContainer, joinFragment)
             .commit()
+    }
+
+    private fun startServiceEgressDiscovery(config: CallConfig) {
+        setJoinOverlayVisible(false)
+        appendLog("Loading service server list")
+        mainFragment()?.onStatusTextChanged("Loading server list")
+        val delivered = AtomicBoolean(false)
+        activeHeadlessController = ServiceJoinController(
+            context = this,
+            host = this,
+            destination = config,
+            discoveryOnly = true,
+            onEgressList = { items ->
+                if (delivered.compareAndSet(false, true)) {
+                    runOnUiThread {
+                        showServiceEgressPicker(config, items)
+                    }
+                }
+            },
+        ).also { it.start() }
+    }
+
+    private fun showServiceEgressPicker(config: CallConfig, items: List<EgressProfileStatus>) {
+        val options = items.sortedWith(
+            compareByDescending<EgressProfileStatus> { it.isDefault }
+                .thenBy { if (it.available == true) 0 else if (it.available == null) 1 else 2 }
+                .thenBy { it.latencyMs ?: Long.MAX_VALUE }
+                .thenBy { it.id }
+        ).map { item ->
+            val title = if (item.isDefault) "${item.id} (default)" else item.id
+            val sub = when {
+                item.available == true -> "${item.latencyMs ?: 0} ms"
+                item.available == false -> item.error ?: "Offline"
+                else -> "Not probed yet"
+            }
+            ChoiceActionSheet.Option(item.id, title, sub)
+        }
+        if (options.isEmpty()) {
+            appendLog("Service returned an empty server list")
+            mainFragment()?.onStatusTextChanged("Server list is empty")
+            return
+        }
+        ChoiceActionSheet.show(
+            manager = supportFragmentManager,
+            title = getString(R.string.sheet_field_egress),
+            subtitle = "Select server for this service",
+            options = options,
+            selectedId = options.firstOrNull { it.id == config.egressId }?.id,
+        ) { picked ->
+            val updated = config.copy(egressId = picked.id)
+            Prefs.updateDestination(updated)
+            onDestinationsChanged()
+            val controller = activeHeadlessController as? ServiceJoinController
+            if (controller != null) {
+                appendLog("Selected egress ${picked.id}")
+                controller.requestWorkSession(picked.id)
+            } else {
+                startJoinFor(updated)
+            }
+        }
     }
 
     private fun startVpnService() {

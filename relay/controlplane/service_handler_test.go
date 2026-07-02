@@ -162,6 +162,48 @@ func TestServiceHandlerAuthorizesListedUsers(t *testing.T) {
 	}
 }
 
+func TestServiceHandlerAuthorizesEgressListRequest(t *testing.T) {
+	fakeTunnel := &fakeDataTunnel{}
+	bridge := tunnel.NewRelayBridge(fakeTunnel, "creator", 1024, t.Logf)
+	handler := ServiceHandler{AllowedUserIDs: map[string]struct{}{"user-1": {}}}
+	if err := handler.BindBridge(context.Background(), bridge); err != nil {
+		t.Fatal(err)
+	}
+
+	fakeTunnel.emit(tunnel.EncodeFrame(tunnel.ControlConnID, tunnel.MsgEgressListRequest, tunnel.EncodeEgressListRequestPayload("user-1")))
+	sent := fakeTunnel.waitSent(t)
+	tunnel.DecodeFrames(sent, func(_ uint32, msgType byte, payload []byte) {
+		if msgType != tunnel.MsgEgressList {
+			t.Fatalf("msgType = %d, want EgressList", msgType)
+		}
+		list, ok := tunnel.DecodeEgressList(payload)
+		if !ok || len(list.Egresses) != 1 || list.Egresses[0].ID != "direct" {
+			t.Fatalf("egress list = %+v, %v", list, ok)
+		}
+	})
+}
+
+func TestServiceHandlerRejectsUnauthorizedEgressListRequest(t *testing.T) {
+	fakeTunnel := &fakeDataTunnel{}
+	bridge := tunnel.NewRelayBridge(fakeTunnel, "creator", 1024, t.Logf)
+	handler := ServiceHandler{AllowedUserIDs: map[string]struct{}{"user-1": {}}}
+	if err := handler.BindBridge(context.Background(), bridge); err != nil {
+		t.Fatal(err)
+	}
+
+	fakeTunnel.emit(tunnel.EncodeFrame(tunnel.ControlConnID, tunnel.MsgEgressListRequest, tunnel.EncodeEgressListRequestPayload("user-2")))
+	sent := fakeTunnel.waitSent(t)
+	tunnel.DecodeFrames(sent, func(_ uint32, msgType byte, payload []byte) {
+		if msgType != tunnel.MsgControlErr {
+			t.Fatalf("msgType = %d, want ControlErr", msgType)
+		}
+		ctrlErr, ok := tunnel.DecodeControlError(payload)
+		if !ok || ctrlErr.Code != "egress_list_unavailable" {
+			t.Fatalf("control error = %+v, %v", ctrlErr, ok)
+		}
+	})
+}
+
 func TestServiceHandlerStoresListedUsersSeparately(t *testing.T) {
 	vault, err := NewCookieVault(t.TempDir(), bytes.Repeat([]byte{2}, 32))
 	if err != nil {

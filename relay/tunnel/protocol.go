@@ -62,6 +62,10 @@ type EgressDescriptor struct {
 	IsDefault bool   `json:"isDefault"`
 }
 
+type EgressListRequest struct {
+	UserID string `json:"userId,omitempty"`
+}
+
 type EgressList struct {
 	Egresses []EgressDescriptor `json:"egresses"`
 }
@@ -174,6 +178,21 @@ func DecodeControlError(payload []byte) (ControlError, bool) {
 
 func EncodeEgressListPayload(egresses []EgressDescriptor) []byte {
 	return encodeControlJSON(EgressList{Egresses: egresses})
+}
+
+func EncodeEgressListRequestPayload(userID string) []byte {
+	return encodeControlJSON(EgressListRequest{UserID: userID})
+}
+
+func DecodeEgressListRequest(payload []byte) (EgressListRequest, bool) {
+	var msg EgressListRequest
+	if len(payload) == 0 {
+		return msg, true
+	}
+	if !decodeControlJSON(payload, &msg) {
+		return msg, false
+	}
+	return msg, true
 }
 
 func DecodeEgressList(payload []byte) (EgressList, bool) {

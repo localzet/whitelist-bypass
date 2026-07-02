@@ -14,10 +14,13 @@ class ServiceJoinController(
     context: Context,
     private val host: JoinFragmentHost,
     private val destination: CallConfig,
+    private val discoveryOnly: Boolean = false,
+    private val onEgressList: ((List<EgressProfileStatus>) -> Unit)? = null,
 ) : JoinController {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val switched = AtomicBoolean(false)
+    private val manualSessionRequested = AtomicBoolean(false)
     private val requestId = UUID.randomUUID().toString()
     private val userId = Prefs.serviceUserId
     private val workPlatform = destination.workPlatform ?: CallPlatform.TELEMOST
@@ -36,8 +39,10 @@ class ServiceJoinController(
             requestId = requestId,
             egressId = destination.egressId,
             tunnelMode = destination.tunnelMode ?: Prefs.tunnelMode,
+            discoveryOnly = discoveryOnly,
         ),
         onServiceSessionReady = ::switchToWorkSession,
+        onEgressDiscoveryChanged = ::handleEgressDiscovery,
     )
 
     override fun start() {
@@ -48,12 +53,20 @@ class ServiceJoinController(
     private fun handleServiceStatus(status: VpnStatus) {
         when (status) {
             VpnStatus.STARTING -> serviceController.sendJoinParams(buildServiceJoinParams().toString())
-            VpnStatus.TUNNEL_ACTIVE -> host.onJoinStatusText("Requesting work call")
+            VpnStatus.TUNNEL_ACTIVE -> host.onJoinStatusText(if (discoveryOnly) "Loading server list" else "Requesting work call")
             else -> host.onJoinStatus(status)
         }
     }
 
+    private fun handleEgressDiscovery(items: List<EgressProfileStatus>) {
+        if (!discoveryOnly || items.isEmpty()) return
+        mainHandler.post {
+            onEgressList?.invoke(items)
+        }
+    }
+
     private fun switchToWorkSession(session: ServiceSessionReady) {
+        if (discoveryOnly && !manualSessionRequested.get()) return
         if (session.requestId != requestId || !switched.compareAndSet(false, true)) return
         mainHandler.post {
             serviceController.stop()
@@ -65,6 +78,13 @@ class ServiceJoinController(
                 url = session.joinLink,
             ).also { it.start() }
         }
+    }
+
+    fun requestWorkSession(egressId: String) {
+        if (!discoveryOnly || switched.get()) return
+        manualSessionRequested.set(true)
+        host.onJoinStatusText("Requesting work call")
+        serviceController.requestServiceSession(egressId)
     }
 
     private fun buildServiceJoinParams(): JSONObject = JSONObject().apply {
