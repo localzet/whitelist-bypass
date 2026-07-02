@@ -7,7 +7,8 @@ services:
       - .env
     # To run the call-carried creator service instead of the VK bot, set in .env:
     # SERVICE_MODE=creator-service
-    # USER_ID=<stable-user-id>
+    # USER_IDS=<client-id-1>,<client-id-2>
+    # MAX_ACTIVE_USERS=2
     # VAULT_KEY_BASE64=<base64-encoded-32-byte-key>
     # EGRESS_CONFIG=/config/egresses.json
     # WORK_PLATFORM=telemost

@@ -46,4 +46,5 @@ export interface JoinerSettings {
 
 export interface ServiceAuthStatus {
   authenticated: boolean;
+  clientId: string;
 }

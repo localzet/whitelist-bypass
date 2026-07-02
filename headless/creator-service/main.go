@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"whitelist-bypass/relay/common"
@@ -19,6 +20,7 @@ import (
 func main() {
 	common.MaybePrintVersion()
 	userID := flag.String("user-id", "", "stable user id for this service call")
+	userIDs := flag.String("user-ids", "", "comma-separated allowlist of stable user ids")
 	serviceCookies := flag.String("service-cookies", "", "path to WB Stream cookies for the bootstrap service call")
 	serviceRoom := flag.String("service-room", "", "existing WB Stream service room id/link to rejoin")
 	displayName := flag.String("name", "Creator Service", "display name in the service room")
@@ -32,16 +34,19 @@ func main() {
 	workPlatform := flag.String("work-platform", controlplane.PlatformTelemost, "default work call platform")
 	customReadBuf := flag.Int("read-buf", 0, "DC read buffer size in bytes, used with -resources custom")
 	customMemLimit := flag.Int64("mem-limit", 0, "memory limit in bytes, used with -resources custom")
+	maxActiveUsers := flag.Int("max-active-users", 128, "maximum users with active work calls")
+	workTTL := flag.Duration("work-ttl", 30*time.Minute, "work call lifetime")
 	flag.Parse()
 
-	if *userID == "" || *serviceCookies == "" || *vaultDir == "" || *vaultKey == "" || *binsDir == "" {
-		log.Fatal("--user-id, --service-cookies, --vault-dir, --vault-key-base64 and --bins-dir are required")
+	allowedUsers := parseAllowedUsers(*userID, *userIDs)
+	if len(allowedUsers) == 0 || *serviceCookies == "" || *vaultDir == "" || *vaultKey == "" || *binsDir == "" {
+		log.Fatal("--user-id or --user-ids, --service-cookies, --vault-dir, --vault-key-base64 and --bins-dir are required")
 	}
 	readBuf, memLimit := resourceLimits(*resources, *customReadBuf, *customMemLimit)
 	if memLimit > 0 {
 		debug.SetMemoryLimit(memLimit)
 	}
-	log.Printf("[config] user=%q resources=%s read-buf=%d mem-limit=%d", *userID, *resources, readBuf, memLimit)
+	log.Printf("[config] allowed-users=%d resources=%s read-buf=%d mem-limit=%d", len(allowedUsers), *resources, readBuf, memLimit)
 
 	key, err := controlplane.CookieVaultKeyFromBase64(*vaultKey)
 	if err != nil {
@@ -63,15 +68,27 @@ func main() {
 	if err != nil {
 		log.Fatalf("[config] work factory: %v", err)
 	}
-	manager := controlplane.NewManager(controlplane.Config{})
-	orchestrator, err := controlplane.NewOrchestrator(manager, registry, workFactory, 30*time.Minute)
+	if *maxActiveUsers <= 0 || *workTTL <= 0 {
+		log.Fatal("--max-active-users and --work-ttl must be positive")
+	}
+	manager := controlplane.NewManager(controlplane.Config{MaxUsers: *maxActiveUsers, WorkTTL: *workTTL})
+	orchestrator, err := controlplane.NewOrchestrator(manager, registry, workFactory, *workTTL)
 	if err != nil {
 		log.Fatalf("[config] orchestrator: %v", err)
 	}
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := orchestrator.CleanupExpired(context.Background()); err != nil {
+				log.Printf("[service] cleanup expired work calls: %v", err)
+			}
+		}
+	}()
 	handler := controlplane.ServiceHandler{
-		UserID:      *userID,
-		CookieVault: vault,
-		Sessions:    orchestrator,
+		AllowedUserIDs: allowedUsers,
+		CookieVault:    vault,
+		Sessions:       orchestrator,
 	}
 
 	roomID, roomToken, accessToken, serverURL := createOrJoinServiceRoom(*serviceCookies, *serviceRoom, *displayName)
@@ -143,6 +160,16 @@ func main() {
 		time.Sleep(3 * time.Second)
 		roomToken, accessToken, serverURL = refreshServiceRoom(*serviceCookies, roomID, *displayName)
 	}
+}
+
+func parseAllowedUsers(single, csv string) map[string]struct{} {
+	allowed := make(map[string]struct{})
+	for _, value := range append([]string{single}, strings.Split(csv, ",")...) {
+		if userID := strings.TrimSpace(value); userID != "" {
+			allowed[userID] = struct{}{}
+		}
+	}
+	return allowed
 }
 
 func createOrJoinServiceRoom(cookiesPath, roomFlag, displayName string) (roomID, roomToken, accessToken, serverURL string) {

@@ -400,6 +400,7 @@ ipcMain.handle(IPC.START, async (_e, settings: JoinerSettings) => {
 
 ipcMain.handle(IPC.SERVICE_AUTH_STATUS, async () => ({
   authenticated: hasServiceCookies(),
+  clientId: serviceUserId(),
 }));
 
 ipcMain.handle(IPC.SERVICE_AUTH_LOGIN, async () => openYandexLogin());

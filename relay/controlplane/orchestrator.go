@@ -92,6 +92,12 @@ func (o *Orchestrator) HandleSessionCreate(ctx context.Context, userID string, r
 	defer func() {
 		o.finishInflight(key, inflight)
 	}()
+	releaseSlot, err := o.manager.AcquireUserSlot(userID)
+	if err != nil {
+		inflight.err = err
+		return tunnel.SessionReady{}, err
+	}
+	defer releaseSlot()
 
 	_, resolvedEgressID, err := o.egress.Select(request.EgressID)
 	if err != nil {
@@ -148,6 +154,16 @@ func sessionReady(session Session) tunnel.SessionReady {
 		EgressID:   session.EgressID,
 		TTLSeconds: ttlSeconds,
 	}
+}
+
+func (o *Orchestrator) CleanupExpired(ctx context.Context) error {
+	var errs []error
+	for _, session := range o.manager.CleanupExpired() {
+		if err := o.factory.CloseWorkCall(ctx, session); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (o *Orchestrator) beginInflight(key string) (*inflightSession, bool) {

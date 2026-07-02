@@ -15,7 +15,17 @@ cp /secure/path/cookies-wbstream.json secrets/cookies-wbstream.json
 chmod 600 .env secrets/* egresses.json
 ```
 
-Укажите в `.env` стабильный UUID клиента как `USER_ID`. Этот же ID создаётся и хранится клиентским приложением автоматически. На текущем этапе один контейнер соответствует одному service-call и одному `USER_ID`.
+Каждый пользователь открывает service settings в Android/Desktop, копирует `Service client ID` и передаёт его администратору. Добавьте полученные UUID в `.env` через запятую:
+
+```env
+USER_IDS=550e8400-e29b-41d4-a716-446655440000,7d444840-9dc0-11d1-b245-5ffdce74fad2
+```
+
+Один контейнер держит один общий service-call для всего allowlist. Клиенты используют одну service-call ссылку и подключаются к bootstrap-каналу последовательно; после `SessionReady` клиент уходит в свой work-call. Cookie vault и лимит одного work-call разделены по проверенному `USER_ID`.
+
+`MAX_ACTIVE_USERS` ограничивает общее число одновременных work-call независимо от размера allowlist. Для VPS с 1 CPU / 1 GB начните с `MAX_ACTIVE_USERS=2` и `RESOURCES=moderate`; `WORK_TTL` автоматически освобождает забытые work-call (default `30m`).
+
+На этом промежуточном этапе UUID — allowlist identifier, а не криптографический client secret. Не публикуйте service-call ссылку открыто. Следующий security layer должен добавить подписанные client credentials без изменения call-carried транспорта.
 
 ## Запуск
 
@@ -31,7 +41,7 @@ docker compose logs -f creator-service
 docker compose exec creator-service cat /data/service-call.txt
 ```
 
-Добавьте эту WB Stream ссылку в клиент как service-call destination, выберите work platform и ручной `egressId`. Клиент передаст Yandex cookies и запрос рабочей сессии внутри звонка, остановит служебное подключение после `SessionReady` и подключится к созданному work-call.
+Передайте эту WB Stream ссылку всем разрешённым клиентам. Добавьте её как service-call destination, выберите work platform и ручной `egressId`. Клиент передаст свой ID, Yandex cookies и запрос рабочей сессии внутри звонка, остановит служебное подключение после `SessionReady` и подключится к созданному work-call.
 
 ## Обновление
 

@@ -1,11 +1,15 @@
 package bypass.whitelist.ui
 
 import android.os.Bundle
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.view.isNotEmpty
 import androidx.fragment.app.Fragment
 import bypass.whitelist.App
@@ -123,6 +127,11 @@ class SettingsScreenFragment : Fragment(R.layout.fragment_settings_screen) {
         }
         addRow(card, R.drawable.ic_setting_autofill, getString(R.string.yandex_account_title), accountStatus, null) {
             (activity as? MainActivityHost)?.pushSubPage(YandexAccountFragment())
+        }
+        addRow(card, R.drawable.ic_setting_autofill, getString(R.string.service_client_id), Prefs.serviceUserId, null) {
+            val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.service_client_id), Prefs.serviceUserId))
+            Toast.makeText(requireContext(), R.string.service_client_id_copied, Toast.LENGTH_SHORT).show()
         }
 
         return section

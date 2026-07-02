@@ -4,9 +4,11 @@ services:
     container_name: whitelist-bypass-creator-service
     restart: unless-stopped
     environment:
-      USER_ID: ${USER_ID:?Set USER_ID in .env}
+      USER_IDS: ${USER_IDS:?Set USER_IDS in .env}
       WORK_PLATFORM: ${WORK_PLATFORM:-telemost}
       RESOURCES: ${RESOURCES:-default}
+      MAX_ACTIVE_USERS: ${MAX_ACTIVE_USERS:-2}
+      WORK_TTL: ${WORK_TTL:-30m}
       VAULT_KEY_FILE: /run/secrets/vault_key
       SERVICE_COOKIES: /run/secrets/service_cookies
       EGRESS_CONFIG: /config/egresses.json

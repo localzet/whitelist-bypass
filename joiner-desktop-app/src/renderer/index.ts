@@ -22,7 +22,7 @@ function platformLabel(p: JoinerPlatform | null): string {
 interface Bridge {
   start(settings: any): Promise<{ ok: boolean; error?: string }>;
   stop(): Promise<{ ok: boolean }>;
-  serviceAuthStatus(): Promise<{ authenticated: boolean }>;
+  serviceAuthStatus(): Promise<{ authenticated: boolean; clientId: string }>;
   serviceAuthLogin(): Promise<{ ok: boolean; error?: string }>;
   serviceAuthClear(): Promise<{ ok: boolean }>;
   onLog(cb: (text: string) => void): void;
@@ -97,6 +97,7 @@ async function refreshServiceAuthStatus() {
   const state = await bridge.serviceAuthStatus();
   serviceAuthStatus.textContent = state.authenticated ? 'Session saved' : 'Sign-in required';
   serviceAuthStatus.dataset.authenticated = String(state.authenticated);
+  $('serviceClientId').textContent = state.clientId;
 }
 
 serviceControl.addEventListener('change', refreshServiceVisibility);
@@ -113,6 +114,10 @@ $('serviceLogin').addEventListener('click', async () => {
 $('serviceForget').addEventListener('click', async () => {
   await bridge.serviceAuthClear();
   await refreshServiceAuthStatus();
+});
+
+$('copyServiceClientId').addEventListener('click', async () => {
+  await navigator.clipboard.writeText($('serviceClientId').textContent ?? '');
 });
 
 stopBtn.disabled = true;

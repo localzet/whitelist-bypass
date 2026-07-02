@@ -39,6 +39,23 @@ func TestManagerCreateIsIdempotentByUserAndRequest(t *testing.T) {
 	}
 }
 
+func TestManagerReservesUserCapacityBeforeSessionCreation(t *testing.T) {
+	manager := NewManager(Config{MaxUsers: 1})
+	release, err := manager.AcquireUserSlot("user-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.AcquireUserSlot("user-2"); err == nil {
+		t.Fatal("AcquireUserSlot() expected max users error")
+	}
+	release()
+	releaseSecond, err := manager.AcquireUserSlot("user-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	releaseSecond()
+}
+
 func TestManagerKeepsOneWorkSessionPerUser(t *testing.T) {
 	manager := NewManager(Config{})
 

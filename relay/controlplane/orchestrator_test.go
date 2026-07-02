@@ -44,6 +44,52 @@ func (f *fakeWorkCallFactory) callCount() int {
 	return len(f.calls)
 }
 
+func TestOrchestratorRejectsUserBeforeCreatingCallAtCapacity(t *testing.T) {
+	manager := NewManager(Config{MaxUsers: 1})
+	if _, _, err := manager.CreateOrReplace(CreateSessionInput{
+		UserID: "user-1", RequestID: "existing", Kind: SessionKindWork,
+		EgressID: "direct", JoinLink: "existing-call",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	factory := &fakeWorkCallFactory{}
+	orchestrator, err := NewOrchestrator(manager, nil, factory, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := orchestrator.HandleSessionCreate(context.Background(), "user-2", tunnel.SessionCreateRequest{
+		RequestID: "request-2", EgressID: "direct",
+	}); err == nil {
+		t.Fatal("HandleSessionCreate() expected max users error")
+	}
+	if factory.callCount() != 0 {
+		t.Fatalf("factory called %d times before capacity rejection", factory.callCount())
+	}
+}
+
+func TestOrchestratorClosesExpiredWorkCalls(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	manager := NewManager(Config{})
+	manager.SetClockForTest(func() time.Time { return now })
+	factory := &fakeWorkCallFactory{next: WorkCall{JoinLink: "expiring-call", TTL: time.Minute}}
+	orchestrator, err := NewOrchestrator(manager, nil, factory, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := orchestrator.HandleSessionCreate(context.Background(), "user-1", tunnel.SessionCreateRequest{
+		RequestID: "expiring", EgressID: "direct",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(2 * time.Minute)
+	if err := orchestrator.CleanupExpired(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(factory.closed) != 1 || factory.closed[0].JoinLink != "expiring-call" {
+		t.Fatalf("closed = %+v", factory.closed)
+	}
+}
+
 func TestOrchestratorCreatesWorkSessionWithDefaultEgress(t *testing.T) {
 	manager := NewManager(Config{})
 	registry, err := egress.NewRegistry("direct", egress.DirectDialer{ProfileID: "direct"})

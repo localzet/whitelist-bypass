@@ -73,6 +73,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .service-settings.visible { display: flex; flex-direction: column; }
 .service-auth-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.service-client-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.service-client-row > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.service-client-row code { overflow: hidden; color: var(--fg); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .service-auth-row > div:first-child { display: flex; flex-direction: column; gap: 2px; }
 .service-auth-row strong { font-size: 12px; }
 .service-auth-row .hint[data-authenticated="true"] { color: var(--ok); }

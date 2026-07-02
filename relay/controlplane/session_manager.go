@@ -45,12 +45,13 @@ type Session struct {
 }
 
 type Manager struct {
-	mu         sync.Mutex
-	cfg        Config
-	now        func() time.Time
-	sessions   map[string]Session
-	byUserKind map[string]map[SessionKind]map[string]struct{}
-	byRequest  map[string]string
+	mu           sync.Mutex
+	cfg          Config
+	now          func() time.Time
+	sessions     map[string]Session
+	byUserKind   map[string]map[SessionKind]map[string]struct{}
+	byRequest    map[string]string
+	reservations map[string]int
 }
 
 func NewManager(cfg Config) *Manager {
@@ -70,12 +71,40 @@ func NewManager(cfg Config) *Manager {
 		cfg.WorkTTL = 30 * time.Minute
 	}
 	return &Manager{
-		cfg:        cfg,
-		now:        time.Now,
-		sessions:   make(map[string]Session),
-		byUserKind: make(map[string]map[SessionKind]map[string]struct{}),
-		byRequest:  make(map[string]string),
+		cfg:          cfg,
+		now:          time.Now,
+		sessions:     make(map[string]Session),
+		byUserKind:   make(map[string]map[SessionKind]map[string]struct{}),
+		byRequest:    make(map[string]string),
+		reservations: make(map[string]int),
 	}
+}
+
+func (m *Manager) AcquireUserSlot(userID string) (func(), error) {
+	if userID == "" {
+		return nil, errors.New("controlplane: user id is required")
+	}
+	m.mu.Lock()
+	_, active := m.byUserKind[userID]
+	_, reserved := m.reservations[userID]
+	if !active && !reserved && m.activeUserCountLocked()+m.reservedUserCountLocked() >= m.cfg.MaxUsers {
+		m.mu.Unlock()
+		return nil, fmt.Errorf("controlplane: max users limit reached")
+	}
+	m.reservations[userID]++
+	m.mu.Unlock()
+
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			m.reservations[userID]--
+			if m.reservations[userID] <= 0 {
+				delete(m.reservations, userID)
+			}
+		})
+	}, nil
 }
 
 func (m *Manager) SetClockForTest(now func() time.Time) {
@@ -91,10 +120,10 @@ func (m *Manager) CreateOrReplace(input CreateSessionInput) (Session, []Session,
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.cleanupExpiredLocked(m.now())
+	removed := m.cleanupExpiredLocked(m.now())
 	if existingID := m.byRequest[requestKey(input.UserID, input.RequestID)]; existingID != "" {
 		if session, ok := m.sessions[existingID]; ok {
-			return session, nil, nil
+			return session, removed, nil
 		}
 		delete(m.byRequest, requestKey(input.UserID, input.RequestID))
 	}
@@ -102,7 +131,6 @@ func (m *Manager) CreateOrReplace(input CreateSessionInput) (Session, []Session,
 		return Session{}, nil, fmt.Errorf("controlplane: max users limit reached")
 	}
 
-	var removed []Session
 	limit := m.limitForKind(input.Kind)
 	for m.countByKindLocked(input.UserID, input.Kind) >= limit {
 		oldest, ok := m.oldestByKindLocked(input.UserID, input.Kind)
@@ -203,6 +231,16 @@ func (m *Manager) deleteLocked(id string) {
 
 func (m *Manager) activeUserCountLocked() int {
 	return len(m.byUserKind)
+}
+
+func (m *Manager) reservedUserCountLocked() int {
+	count := 0
+	for userID := range m.reservations {
+		if _, active := m.byUserKind[userID]; !active {
+			count++
+		}
+	}
+	return count
 }
 
 func (m *Manager) countByKindLocked(userID string, kind SessionKind) int {

@@ -3,6 +3,7 @@ package controlplane
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -117,5 +118,53 @@ func TestServiceHandlerRejectsInvalidBinding(t *testing.T) {
 	bridge := tunnel.NewRelayBridge(fakeTunnel, "creator", 1024, t.Logf)
 	if err := (ServiceHandler{}).BindBridge(context.Background(), bridge); err == nil {
 		t.Fatal("BindBridge() expected missing user id error")
+	}
+}
+
+func TestServiceHandlerAuthorizesListedUsers(t *testing.T) {
+	handler := ServiceHandler{AllowedUserIDs: map[string]struct{}{"user-1": {}, "user-2": {}}}
+	for _, userID := range []string{"user-1", "user-2"} {
+		got, err := handler.authorizeUser(userID)
+		if err != nil || got != userID {
+			t.Fatalf("authorizeUser(%q) = %q, %v", userID, got, err)
+		}
+	}
+	if _, err := handler.authorizeUser("user-3"); err == nil {
+		t.Fatal("authorizeUser() expected unauthorized error")
+	}
+	if _, err := handler.authorizeUser(""); err == nil {
+		t.Fatal("authorizeUser() expected empty user error")
+	}
+}
+
+func TestServiceHandlerStoresListedUsersSeparately(t *testing.T) {
+	vault, err := NewCookieVault(t.TempDir(), bytes.Repeat([]byte{2}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakeTunnel := &fakeDataTunnel{}
+	bridge := tunnel.NewRelayBridge(fakeTunnel, "creator", 1024, t.Logf)
+	handler := ServiceHandler{
+		AllowedUserIDs: map[string]struct{}{"user-1": {}, "user-2": {}},
+		CookieVault:    vault,
+	}
+	if err := handler.BindBridge(context.Background(), bridge); err != nil {
+		t.Fatal(err)
+	}
+	for _, userID := range []string{"user-1", "user-2"} {
+		fakeTunnel.emit(tunnel.EncodeFrame(tunnel.ControlConnID, tunnel.MsgCookieSubmit, tunnel.EncodeCookieSubmitPayload(tunnel.CookieSubmit{
+			RequestID: "cookie-" + userID,
+			UserID:    userID,
+			Platform:  PlatformTelemost,
+			Format:    CookieFormatJSON,
+			Payload:   `[{"name":"Session_id","value":"` + userID + `"}]`,
+		})))
+		stored, err := vault.Load(userID, PlatformTelemost)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(stored.Payload, userID) {
+			t.Fatalf("vault payload for %q does not contain its marker", userID)
+		}
 	}
 }
