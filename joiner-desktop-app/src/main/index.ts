@@ -314,6 +314,11 @@ function spawnJoiner(settings: JoinerSettings): { ok: boolean; error?: string } 
     let pending = '';
     return (text: string) => {
       send(IPC.LOG, text);
+      const errorMatch = text.match(/STATUS:ERROR:(.+)/);
+      if (errorMatch) {
+        userRequestedStop = true;
+        send(IPC.STATUS, 'stopped');
+      }
       pending += text;
       const lines = pending.split(/\r?\n/);
       pending = lines.pop() ?? '';

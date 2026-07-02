@@ -255,6 +255,7 @@ func main() {
 		bridgeMu sync.Mutex
 	)
 	serviceReadyCh := make(chan tunnel.SessionReady, 1)
+	serviceErrorCh := make(chan string, 1)
 	serviceCookieAckCh := make(chan tunnel.CookieAck, 1)
 	serviceRuntime := newServiceControlRuntime()
 	onConnected := func(t tunnel.DataTunnel) {
@@ -278,6 +279,17 @@ func main() {
 				select {
 				case serviceCookieAckCh <- ack:
 				default:
+				}
+			})
+			bridge.SetOnControlError(func(controlErr tunnel.ControlError) {
+				log.Printf("[service] control error %s: %s", controlErr.Code, controlErr.SafeMessage)
+				if isTerminalServiceError(controlErr) {
+					serviceRuntime.markReady()
+					fmt.Printf("STATUS:ERROR:%s\n", controlErr.SafeMessage)
+					select {
+					case serviceErrorCh <- controlErr.SafeMessage:
+					default:
+					}
 				}
 			})
 			bridge.SetOnSessionReady(func(session tunnel.SessionReady) {
@@ -346,11 +358,15 @@ func main() {
 	}
 
 	var lost bool
+	var failed bool
 	select {
 	case <-sig:
 		log.Printf("[main] shutting down")
 	case session := <-serviceReadyCh:
 		log.Printf("[service] work session ready id=%s egress=%s", session.SessionID, session.EgressID)
+	case msg := <-serviceErrorCh:
+		log.Printf("[service] failed: %s", msg)
+		failed = true
 	case <-tunnelLostCh:
 		log.Printf("[main] tunnel lost, exiting with code 2 to trigger auto-reconnect")
 		lost = true
@@ -362,6 +378,9 @@ func main() {
 	time.Sleep(200 * time.Millisecond)
 	if lost {
 		os.Exit(2)
+	}
+	if failed {
+		os.Exit(1)
 	}
 }
 
@@ -639,6 +658,15 @@ func requestServiceSessionWithoutCookies(bridge *tunnel.RelayBridge, cfg service
 		Mode:      cfg.TunnelMode,
 	})
 	log.Printf("[service] retried work session request platform=%q egress=%q request=%q", cfg.WorkPlatform, cfg.EgressID, cfg.RequestID)
+}
+
+func isTerminalServiceError(controlErr tunnel.ControlError) bool {
+	switch controlErr.Code {
+	case "session_create_failed", "cookie_submit_failed", "bad_session_request", "bad_cookie_submit", "session_control_unavailable", "cookie_vault_unavailable":
+		return true
+	default:
+		return false
+	}
 }
 
 func newRequestID() string {

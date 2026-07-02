@@ -17,6 +17,7 @@ import (
 )
 
 const serviceSessionReadyMarker = "SERVICE_SESSION_READY:"
+const serviceControlErrorMarker = "STATUS:ERROR:"
 
 const (
 	serviceSessionRetryInterval = 2 * time.Second
@@ -121,6 +122,13 @@ func configureServiceBridge(bridge *tunnel.RelayBridge, cfg serviceControlConfig
 		log.Printf("[service] cookie stored platform=%q request=%q", ack.Platform, ack.RequestID)
 		rt.markCookieAcked()
 	})
+	bridge.SetOnControlError(func(controlErr tunnel.ControlError) {
+		log.Printf("[service] control error %s: %s", controlErr.Code, controlErr.SafeMessage)
+		if isTerminalServiceError(controlErr) {
+			rt.markReady()
+			emit(serviceControlErrorMarker + controlErr.SafeMessage)
+		}
+	})
 	bridge.SetOnSessionReady(func(session tunnel.SessionReady) {
 		payload, err := json.Marshal(session)
 		if err != nil {
@@ -130,6 +138,15 @@ func configureServiceBridge(bridge *tunnel.RelayBridge, cfg serviceControlConfig
 		rt.markReady()
 		emit(serviceSessionReadyMarker + string(payload))
 	})
+}
+
+func isTerminalServiceError(controlErr tunnel.ControlError) bool {
+	switch controlErr.Code {
+	case "session_create_failed", "cookie_submit_failed", "bad_session_request", "bad_cookie_submit", "session_control_unavailable", "cookie_vault_unavailable":
+		return true
+	default:
+		return false
+	}
 }
 
 func requestServiceSession(bridge *tunnel.RelayBridge, cfg serviceControlConfig) {

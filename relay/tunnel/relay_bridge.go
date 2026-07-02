@@ -91,6 +91,9 @@ type RelayBridge struct {
 
 	onCookieAckMu sync.Mutex
 	onCookieAck   func(CookieAck)
+
+	onControlErrorMu sync.Mutex
+	onControlError   func(ControlError)
 }
 
 func (rb *RelayBridge) SetOnPeerConfig(fn func(fps, batch, trackCount int)) {
@@ -135,6 +138,12 @@ func (rb *RelayBridge) SetOnCookieAck(fn func(CookieAck)) {
 
 func (rb *RelayBridge) SubmitCookies(cookie CookieSubmit) {
 	rb.send(ControlConnID, MsgCookieSubmit, EncodeCookieSubmitPayload(cookie))
+}
+
+func (rb *RelayBridge) SetOnControlError(fn func(ControlError)) {
+	rb.onControlErrorMu.Lock()
+	rb.onControlError = fn
+	rb.onControlErrorMu.Unlock()
 }
 
 func NewRelayBridgeWithAuth(tunnel DataTunnel, mode string, readBuf int, logFn func(string, ...any), socksUser, socksPass string) *RelayBridge {
@@ -446,6 +455,12 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 				}
 				rb.setHandshakeError(fmt.Errorf("%s: %s", ctrlErr.Code, ctrlErr.SafeMessage))
 				rb.logFn("relay: control error %s: %s", ctrlErr.Code, ctrlErr.SafeMessage)
+				rb.onControlErrorMu.Lock()
+				cb := rb.onControlError
+				rb.onControlErrorMu.Unlock()
+				if cb != nil {
+					cb(ctrlErr)
+				}
 			}
 			return
 		}

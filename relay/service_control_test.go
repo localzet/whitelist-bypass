@@ -98,3 +98,26 @@ func TestConfigureServiceBridgeEmitsReadyMarker(t *testing.T) {
 		t.Fatal("runtime was not marked ready")
 	}
 }
+
+func TestConfigureServiceBridgeStopsOnTerminalError(t *testing.T) {
+	fake := &serviceFakeTunnel{}
+	bridge := tunnel.NewRelayBridge(fake, "joiner", 1024, t.Logf)
+	runtime := newServiceControlRuntime()
+	var emitted string
+	configureServiceBridge(bridge, serviceControlConfig{}, runtime, func(line string) { emitted = line })
+
+	fake.onData(tunnel.EncodeFrame(
+		tunnel.ControlConnID,
+		tunnel.MsgControlErr,
+		tunnel.EncodeControlErrorPayload("session_create_failed", "work call failed"),
+	))
+
+	if emitted != serviceControlErrorMarker+"work call failed" {
+		t.Fatalf("emitted = %q", emitted)
+	}
+	select {
+	case <-runtime.ready:
+	default:
+		t.Fatal("runtime was not stopped")
+	}
+}
