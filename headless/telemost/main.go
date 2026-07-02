@@ -890,7 +890,7 @@ func main() {
 	resources := flag.String("resources", "default", "resource mode: default, moderate, unlimited, custom")
 	customReadBuf := flag.Int("read-buf", 0, "read buffer size, used with -resources custom")
 	customMemLimit := flag.Int64("mem-limit", 0, "memory limit in bytes, used with -resources custom")
-	writeFile := flag.String("write-file", "", "path to file where active call link is appended")
+	writeFile := flag.String("write-file", "", "path to file where active call link is written")
 	upstreamSocks := flag.String("upstream-socks", "", "route tunneled egress through this SOCKS5 proxy (host:port), e.g. a local VPN client")
 	upstreamUser := flag.String("upstream-user", "", "upstream SOCKS5 username")
 	upstreamPass := flag.String("upstream-pass", "", "upstream SOCKS5 password")
@@ -1000,12 +1000,9 @@ func main() {
 	}
 
 	if *writeFile != "" {
-		f, err := os.OpenFile(*writeFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatalf("Failed to open write-file: %v", err)
+		if err := os.WriteFile(*writeFile, []byte(connInfo.ConferenceURI+"\n"), 0644); err != nil {
+			log.Fatalf("Failed to write write-file: %v", err)
 		}
-		fmt.Fprintln(f, connInfo.ConferenceURI)
-		f.Close()
 		log.Printf("[config] Wrote call link to %s", *writeFile)
 	}
 

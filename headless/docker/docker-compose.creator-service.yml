@@ -10,6 +10,7 @@ services:
       RESOURCES: ${RESOURCES:-default}
       MAX_ACTIVE_USERS: ${MAX_ACTIVE_USERS:-2}
       WORK_TTL: ${WORK_TTL:-30m}
+      SERVICE_ROOM: ${SERVICE_ROOM:-}
       VAULT_KEY_FILE: /run/secrets/vault_key
       SERVICE_COOKIES: /run/secrets/yandex_cookies
       EGRESS_CONFIG: /config/egresses.json

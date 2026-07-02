@@ -47,7 +47,15 @@ docker compose exec creator-service cat /data/service-call.txt
 
 Передайте эту Telemost-ссылку разрешённым клиентам. Добавьте её как service-call destination, выберите рабочую платформу и при необходимости ручной `egressId`.
 
-Чтобы после перезапуска подключаться к уже существующему звонку, задайте `SERVICE_ROOM` равным сохранённой Telemost-ссылке. Без него контейнер создаст новый служебный звонок.
+При перезапуске контейнер автоматически перечитает `/data/service-call.txt` и подключится к уже существующему служебному звонку. `SERVICE_ROOM` нужен только как ручной override, если вы хотите принудительно подключиться к другой Telemost-ссылке.
+
+Чтобы принудительно создать новый служебный звонок, остановите контейнер и удалите сохранённую ссылку из volume:
+
+```sh
+docker compose stop creator-service
+docker compose run --rm --entrypoint sh creator-service -c 'rm -f /data/service-call.txt'
+docker compose up -d
+```
 
 ## Обновление
 

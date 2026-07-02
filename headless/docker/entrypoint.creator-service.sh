@@ -21,7 +21,13 @@ WORK_TTL="${WORK_TTL:-30m}"
 SERVICE_WRITE_FILE="${SERVICE_WRITE_FILE:-/data/service-call.txt}"
 
 mkdir -p "$VAULT_DIR" "$SESSIONS_DIR"
-rm -f "$SERVICE_WRITE_FILE"
+if [ -z "${SERVICE_ROOM:-}" ] && [ -s "$SERVICE_WRITE_FILE" ]; then
+    SERVICE_ROOM="$(head -n 1 "$SERVICE_WRITE_FILE" | tr -d '\r\n')"
+    [ -n "$SERVICE_ROOM" ] && echo "Reusing service room from $SERVICE_WRITE_FILE"
+fi
+if [ -z "${SERVICE_ROOM:-}" ]; then
+    rm -f "$SERVICE_WRITE_FILE"
+fi
 
 set -- \
     --service-control \
