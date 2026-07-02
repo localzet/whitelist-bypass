@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -39,6 +40,27 @@ func CookieValue(cookieHeader, name string) string {
 		}
 	}
 	return ""
+}
+
+func CookieNames(cookieHeader string) []string {
+	seen := make(map[string]struct{})
+	for _, part := range strings.Split(cookieHeader, ";") {
+		part = strings.TrimSpace(part)
+		eq := strings.IndexByte(part, '=')
+		if eq <= 0 {
+			continue
+		}
+		name := strings.TrimSpace(part[:eq])
+		if name != "" {
+			seen[name] = struct{}{}
+		}
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func FilterCookies(cookieHeader string, allow []string) string {

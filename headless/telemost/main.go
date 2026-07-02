@@ -971,6 +971,11 @@ func main() {
 		}
 		cookieStr = strings.TrimSpace(line)
 	}
+	log.Printf("[auth] cookies names=%v hasSessionID=%t hasSessionID2=%t",
+		common.CookieNames(cookieStr),
+		common.CookieValue(cookieStr, "Session_id") != "",
+		common.CookieValue(cookieStr, "sessionid2") != "",
+	)
 
 	log.Println("[config] Fetching live config from Telemost bundle...")
 	cfg, err := fetchConfig()

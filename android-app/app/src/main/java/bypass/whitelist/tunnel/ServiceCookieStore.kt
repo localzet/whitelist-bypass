@@ -10,7 +10,11 @@ import java.io.FileOutputStream
 object ServiceCookieStore {
     private val yandexCookieUrls = listOf(
         "https://yandex.ru/",
+        "https://ya.ru/",
+        "https://login.yandex.ru/",
+        "https://oauth.yandex.ru/",
         "https://passport.yandex.ru/",
+        "https://cloud-api.yandex.ru/",
         "https://telemost.yandex.ru/",
         "https://telemost.ya.ru/",
     )
@@ -67,6 +71,7 @@ object ServiceCookieStore {
             }
         }
         require(!cookies[YANDEX_AUTH_COOKIE].isNullOrEmpty()) { "Yandex session cookie not found" }
+        require(!cookies[YANDEX_AUTH_COOKIE_2].isNullOrEmpty()) { "Yandex secondary session cookie not found" }
         return cookies
     }
 
@@ -79,4 +84,5 @@ object ServiceCookieStore {
         File(File(File(context.filesDir, "service-cookies"), userId), "${platform.id}.json")
 
     private const val YANDEX_AUTH_COOKIE = "Session_id"
+    private const val YANDEX_AUTH_COOKIE_2 = "sessionid2"
 }
