@@ -27,6 +27,9 @@ const (
 	TmPingPeriod                  = 5 * time.Second
 	telemostReconnectInitialDelay = time.Second
 	telemostReconnectMaxDelay     = 16 * time.Second
+	telemostSlotRefreshAttempts   = 8
+	telemostSlotRefreshInterval   = 750 * time.Millisecond
+	telemostSlotRefreshCooldown   = 10 * time.Second
 )
 
 type TelemostHeadlessJoiner struct {
@@ -84,11 +87,13 @@ type TelemostHeadlessJoiner struct {
 	stopOnce         sync.Once
 	reconnectAttempt atomic.Int32
 
-	setSlotsKey    int
-	initBundleSent bool
-	boundPeers     map[string]bool
-	unboundPeers   map[string]bool
-	boundMu        sync.Mutex
+	setSlotsKey     int
+	initBundleSent  bool
+	boundPeers      map[string]bool
+	unboundPeers    map[string]bool
+	boundMu         sync.Mutex
+	slotRefresh     atomic.Bool
+	lastSlotRefresh atomic.Int64
 }
 
 func NewTelemostHeadlessJoiner(logFn func(string, ...any), resolveFn ResolveFunc, status StatusEmitter, pcConfig PeerConnectionConfigurer, addTracks AddTunnelTracksFunc, readTrackFn ReadTrackFunc) *TelemostHeadlessJoiner {
@@ -568,6 +573,46 @@ func (j *TelemostHeadlessJoiner) requestVideoSlots() {
 	j.wsSend(tmapi.SetSlotsMessage(j.setSlotsKey))
 }
 
+func (j *TelemostHeadlessJoiner) scheduleSlotRefresh(reason string) {
+	now := time.Now()
+	last := time.Unix(0, j.lastSlotRefresh.Load())
+	if !last.IsZero() && now.Sub(last) < telemostSlotRefreshCooldown {
+		return
+	}
+	if !j.slotRefresh.CompareAndSwap(false, true) {
+		return
+	}
+	j.lastSlotRefresh.Store(now.UnixNano())
+	go func() {
+		defer j.slotRefresh.Store(false)
+		for attempt := 1; attempt <= telemostSlotRefreshAttempts; attempt++ {
+			if j.isClosed() || j.hasBoundPeer() {
+				return
+			}
+			if attempt > 1 {
+				timer := time.NewTimer(telemostSlotRefreshInterval)
+				select {
+				case <-timer.C:
+				case <-j.stopCh:
+					timer.Stop()
+					return
+				}
+			}
+			if j.isClosed() || j.hasBoundPeer() {
+				return
+			}
+			j.logFn("telemost-joiner: refreshing video slots reason=%s attempt=%d/%d", reason, attempt, telemostSlotRefreshAttempts)
+			j.requestVideoSlots()
+		}
+	}()
+}
+
+func (j *TelemostHeadlessJoiner) hasBoundPeer() bool {
+	j.boundMu.Lock()
+	defer j.boundMu.Unlock()
+	return len(j.boundPeers) > 0
+}
+
 func (j *TelemostHeadlessJoiner) forceReconnect(reason string) {
 	j.reconnectAttempt.Store(0)
 	oldPeerID := j.peerID
@@ -653,6 +698,8 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 			j.parseICEServersFromHello(sh)
 		}
 		j.ack(uid)
+		j.logFn("telemost-joiner: -> setSlotsOffset")
+		j.wsSend(tmapi.SetSlotsOffsetMessage(0))
 		j.initPC()
 		return
 	}
@@ -723,11 +770,13 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 
 	if ud, ok := msg["upsertDescription"]; ok {
 		udMap, _ := ud.(map[string]interface{})
+		hasRemoteParticipant := false
 		if descs, ok := udMap["description"].([]interface{}); ok {
 			for _, d := range descs {
 				dm, _ := d.(map[string]interface{})
 				pid, _ := dm["id"].(string)
 				if pid != "" && pid != j.peerID {
+					hasRemoteParticipant = true
 					participantName := ""
 					if meta, ok := dm["meta"].(map[string]interface{}); ok {
 						participantName, _ = meta["name"].(string)
@@ -736,12 +785,16 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 				}
 			}
 		}
+		if hasRemoteParticipant {
+			j.scheduleSlotRefresh("participant-description")
+		}
 		j.ack(uid)
 		return
 	}
 
 	if ud, ok := msg["updateDescription"]; ok {
 		j.logFn("telemost-joiner: <- updateDescription %s", tmapi.BriefJSON(ud))
+		j.scheduleSlotRefresh("description-update")
 		j.ack(uid)
 		return
 	}
@@ -789,6 +842,7 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 				} else {
 					j.logFn("telemost-joiner: [bind] UNBOUND slot=%d pid=%s reason=%s mid=%q", ev.Slot, pid, ev.Reason, ev.Mid)
 				}
+				j.scheduleSlotRefresh("unbound-slot")
 			}
 		}
 		j.boundMu.Lock()
@@ -808,6 +862,9 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 	}
 
 	for k, v := range msg {
+		if k == "slotsMeta" {
+			j.scheduleSlotRefresh("slots-meta")
+		}
 		if k == "uid" || k == "ack" {
 			continue
 		}

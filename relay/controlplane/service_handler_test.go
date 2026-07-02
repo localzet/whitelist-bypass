@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 )
 
 type fakeDataTunnel struct {
+	mu     sync.Mutex
 	onData func([]byte)
 	sent   [][]byte
 }
@@ -18,6 +20,8 @@ type fakeDataTunnel struct {
 func (f *fakeDataTunnel) SendData(data []byte) {
 	cp := make([]byte, len(data))
 	copy(cp, data)
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.sent = append(f.sent, cp)
 }
 
@@ -31,6 +35,31 @@ func (f *fakeDataTunnel) Reconfigure(_, _ int) {}
 
 func (f *fakeDataTunnel) emit(data []byte) {
 	f.onData(data)
+}
+
+func (f *fakeDataTunnel) waitSent(t *testing.T) []byte {
+	return f.waitSentAfter(t, 0)
+}
+
+func (f *fakeDataTunnel) waitSentAfter(t *testing.T, previous int) []byte {
+	t.Helper()
+	deadline := time.After(time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		f.mu.Lock()
+		if len(f.sent) > previous {
+			frame := f.sent[len(f.sent)-1]
+			f.mu.Unlock()
+			return frame
+		}
+		f.mu.Unlock()
+		select {
+		case <-deadline:
+			t.Fatal("expected sent frame")
+		case <-ticker.C:
+		}
+	}
 }
 
 func TestServiceHandlerStoresCookiesThroughBridge(t *testing.T) {
@@ -51,11 +80,9 @@ func TestServiceHandlerStoresCookiesThroughBridge(t *testing.T) {
 		Format:    CookieFormatJSON,
 		Payload:   `[{"name":"Session_id","value":"secret"}]`,
 	})))
-	if len(fakeTunnel.sent) == 0 {
-		t.Fatal("expected CookieAck frame")
-	}
+	sent := fakeTunnel.waitSent(t)
 	var ack tunnel.CookieAck
-	tunnel.DecodeFrames(fakeTunnel.sent[len(fakeTunnel.sent)-1], func(_ uint32, msgType byte, payload []byte) {
+	tunnel.DecodeFrames(sent, func(_ uint32, msgType byte, payload []byte) {
 		if msgType != tunnel.MsgCookieAck {
 			t.Fatalf("msgType = %d, want CookieAck", msgType)
 		}
@@ -91,11 +118,9 @@ func TestServiceHandlerCreatesSessionThroughBridge(t *testing.T) {
 		RequestID: "req-1",
 		EgressID:  "direct",
 	})))
-	if len(fakeTunnel.sent) == 0 {
-		t.Fatal("expected SessionReady frame")
-	}
+	sent := fakeTunnel.waitSent(t)
 	var ready tunnel.SessionReady
-	tunnel.DecodeFrames(fakeTunnel.sent[len(fakeTunnel.sent)-1], func(_ uint32, msgType byte, payload []byte) {
+	tunnel.DecodeFrames(sent, func(_ uint32, msgType byte, payload []byte) {
 		if msgType != tunnel.MsgSessionReady {
 			t.Fatalf("msgType = %d, want SessionReady", msgType)
 		}
@@ -152,6 +177,9 @@ func TestServiceHandlerStoresListedUsersSeparately(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, userID := range []string{"user-1", "user-2"} {
+		fakeTunnel.mu.Lock()
+		previousSent := len(fakeTunnel.sent)
+		fakeTunnel.mu.Unlock()
 		fakeTunnel.emit(tunnel.EncodeFrame(tunnel.ControlConnID, tunnel.MsgCookieSubmit, tunnel.EncodeCookieSubmitPayload(tunnel.CookieSubmit{
 			RequestID: "cookie-" + userID,
 			UserID:    userID,
@@ -159,6 +187,7 @@ func TestServiceHandlerStoresListedUsersSeparately(t *testing.T) {
 			Format:    CookieFormatJSON,
 			Payload:   `[{"name":"Session_id","value":"` + userID + `"}]`,
 		})))
+		fakeTunnel.waitSentAfter(t, previousSent)
 		stored, err := vault.Load(userID, PlatformTelemost)
 		if err != nil {
 			t.Fatal(err)

@@ -527,13 +527,16 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("session_control_unavailable", "session control is not available"))
 					return
 				}
-				session, err := cb(request)
-				if err != nil {
-					rb.logFn("relay: session create failed: %v", err)
-					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("session_create_failed", common.MaskError(err)))
-					return
-				}
-				rb.send(ControlConnID, MsgSessionReady, EncodeSessionReadyPayload(session))
+				go func() {
+					session, err := cb(request)
+					if err != nil {
+						rb.logFn("relay: session create failed: %v", err)
+						rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("session_create_failed", common.MaskError(err)))
+						return
+					}
+					rb.logFn("relay: sending SessionReady request=%q session=%q egress=%q", session.RequestID, session.SessionID, session.EgressID)
+					rb.send(ControlConnID, MsgSessionReady, EncodeSessionReadyPayload(session))
+				}()
 			}
 			return
 		}
@@ -569,13 +572,16 @@ func (rb *RelayBridge) handleTunnelData(data []byte) {
 					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("cookie_vault_unavailable", "cookie storage is not available"))
 					return
 				}
-				ack, err := cb(cookie)
-				if err != nil {
-					rb.logFn("relay: cookie submit failed platform=%q request=%q: %s", cookie.Platform, cookie.RequestID, common.MaskError(err))
-					rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("cookie_submit_failed", common.MaskError(err)))
-					return
-				}
-				rb.send(ControlConnID, MsgCookieAck, EncodeCookieAckPayload(ack))
+				go func() {
+					ack, err := cb(cookie)
+					if err != nil {
+						rb.logFn("relay: cookie submit failed platform=%q request=%q: %s", cookie.Platform, cookie.RequestID, common.MaskError(err))
+						rb.send(ControlConnID, MsgControlErr, EncodeControlErrorPayload("cookie_submit_failed", common.MaskError(err)))
+						return
+					}
+					rb.logFn("relay: sending CookieAck request=%q platform=%q stored=%t", ack.RequestID, ack.Platform, ack.Stored)
+					rb.send(ControlConnID, MsgCookieAck, EncodeCookieAckPayload(ack))
+				}()
 			}
 			return
 		}
