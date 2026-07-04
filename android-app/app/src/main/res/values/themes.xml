@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Base.Theme.WhitelistBypass" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Base.Theme.VConnect" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/accent_emerald</item>
         <item name="colorOnPrimary">@color/panel_bg</item>
         <item name="colorPrimaryContainer">@color/accent_emerald_soft</item>
@@ -21,21 +21,21 @@
         <item name="colorOutline">@color/hair_strong</item>
         <item name="colorOutlineVariant">@color/hair</item>
         <item name="colorError">@color/error_red</item>
-        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.WhitelistBypass.BottomSheetDialog</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.VConnect.BottomSheetDialog</item>
     </style>
 
-    <style name="ThemeOverlay.WhitelistBypass.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
-        <item name="bottomSheetStyle">@style/Widget.WhitelistBypass.BottomSheet</item>
+    <style name="ThemeOverlay.VConnect.BottomSheetDialog" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.VConnect.BottomSheet</item>
         <item name="android:windowAnimationStyle">@style/Animation.Design.BottomSheetDialog</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
     </style>
 
-    <style name="Widget.WhitelistBypass.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
-        <item name="shapeAppearance">@style/ShapeAppearance.WhitelistBypass.BottomSheet</item>
+    <style name="Widget.VConnect.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="shapeAppearance">@style/ShapeAppearance.VConnect.BottomSheet</item>
         <item name="backgroundTint">@color/panel_bg</item>
     </style>
 
-    <style name="ShapeAppearance.WhitelistBypass.BottomSheet" parent="">
+    <style name="ShapeAppearance.VConnect.BottomSheet" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSizeTopLeft">24dp</item>
         <item name="cornerSizeTopRight">24dp</item>
@@ -65,9 +65,9 @@
         <item name="android:textSize">14sp</item>
     </style>
 
-    <style name="Theme.WhitelistBypass" parent="Base.Theme.WhitelistBypass" />
+    <style name="Theme.VConnect" parent="Base.Theme.VConnect" />
 
-    <style name="Theme.WhitelistBypass.Violet" parent="Base.Theme.WhitelistBypass">
+    <style name="Theme.VConnect.Violet" parent="Base.Theme.VConnect">
         <item name="colorPrimary">@color/accent_violet</item>
         <item name="colorPrimaryContainer">@color/accent_violet_soft</item>
         <item name="colorOnPrimaryContainer">@color/accent_violet</item>

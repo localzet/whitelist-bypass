@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT=/workspace
-REPO="${ROOT}/whitelist-bypass"
+REPO="${ROOT}/vconnect"
 
 export HOME=/root
 export ANDROID_HOME=/root/Library/Android/sdk

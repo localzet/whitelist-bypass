@@ -6,10 +6,10 @@ import (
 	"net"
 	"sync"
 
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/pion"
-	joiner "whitelist-bypass/relay/pion/headless-joiner-common"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/pion"
+	joiner "vconnect/relay/pion/headless-joiner-common"
+	"vconnect/relay/tunnel"
 )
 
 type HeadlessCallback interface {

@@ -27,13 +27,13 @@ import (
 	"syscall"
 	"time"
 
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/desktoptun"
-	"whitelist-bypass/relay/dion"
-	"whitelist-bypass/relay/pion"
-	joinerCommon "whitelist-bypass/relay/pion/headless-joiner-common"
-	"whitelist-bypass/relay/tunnel"
-	"whitelist-bypass/relay/wbstream"
+	"vconnect/relay/common"
+	"vconnect/relay/desktoptun"
+	"vconnect/relay/dion"
+	"vconnect/relay/pion"
+	joinerCommon "vconnect/relay/pion/headless-joiner-common"
+	"vconnect/relay/tunnel"
+	"vconnect/relay/wbstream"
 )
 
 type statusEmitter struct{}
@@ -71,7 +71,7 @@ func newFileCacheStore() *fileCacheStore {
 	if dir == "" {
 		dir = os.TempDir()
 	}
-	cacheDir := filepath.Join(dir, "whitelist-bypass")
+	cacheDir := filepath.Join(dir, "vconnect")
 	os.MkdirAll(cacheDir, 0755)
 	return &fileCacheStore{dir: cacheDir}
 }
@@ -89,7 +89,7 @@ func (c *fileCacheStore) Load(key string) string {
 }
 
 const (
-	tunAdapter = "WhitelistBypass"
+	tunAdapter = "VConnect"
 	tunIP      = "10.99.0.2"
 	tunMask    = "255.255.255.0"
 	tunPeer    = "10.99.0.1"

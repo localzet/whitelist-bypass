@@ -1,7 +1,7 @@
 services:
   creator-service:
-    image: ghcr.io/localzet/whitelist-bypass-creator-service:latest
-    container_name: whitelist-bypass-creator-service
+    image: ghcr.io/localzet/vconnect-creator-service:latest
+    container_name: vconnect-creator-service
     restart: unless-stopped
     environment:
       USER_IDS: ${USER_IDS:?Set USER_IDS in .env}

@@ -1,5 +1,5 @@
 {
-  "name": "whitelist-bypass-creator",
+  "name": "vconnect-creator",
   "version": "0.3.7",
   "main": "dist/main/index.js",
   "scripts": {
@@ -18,7 +18,7 @@
     "typescript": "^5.6.0"
   },
   "build": {
-    "appId": "whitelist.bypass.creator",
+    "appId": "app.vconnect.creator",
     "productName": "VConnect Creator",
     "directories": {
       "output": "../prebuilts"

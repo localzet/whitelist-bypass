@@ -58,4 +58,4 @@ fi
 
 echo ""
 echo "=== Done ==="
-ls -lh "$ROOT/prebuilts"/WhitelistBypass* 2>/dev/null || true
+ls -lh "$ROOT/prebuilts"/VConnect* 2>/dev/null || true

@@ -9,7 +9,7 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
+	"vconnect/relay/common"
 )
 
 type SignalingMessage struct {

@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/tunnel"
 )
 
 const serviceSessionReadyMarker = "SERVICE_SESSION_READY:"

@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"whitelist-bypass/relay/common"
+	"vconnect/relay/common"
 )
 
 const (

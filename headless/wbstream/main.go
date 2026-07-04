@@ -8,10 +8,10 @@ import (
 	"runtime/debug"
 	"time"
 
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/egress"
-	"whitelist-bypass/relay/tunnel"
-	"whitelist-bypass/relay/wbstream"
+	"vconnect/relay/common"
+	"vconnect/relay/egress"
+	"vconnect/relay/tunnel"
+	"vconnect/relay/wbstream"
 )
 
 func main() {

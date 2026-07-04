@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/dion"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/dion"
+	"vconnect/relay/tunnel"
 )
 
 func main() {

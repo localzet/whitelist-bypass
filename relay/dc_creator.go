@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/egress"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/egress"
+	"vconnect/relay/tunnel"
 )
 
 const (

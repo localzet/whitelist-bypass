@@ -1,7 +1,7 @@
 services:
   bot:
-    image: ghcr.io/kulikov0/whitelist-bypass-bot:latest
-    container_name: whitelist-bypass-bot
+    image: ghcr.io/localzet/vconnect-bot:latest
+    container_name: vconnect-bot
     restart: unless-stopped
     env_file:
       - .env

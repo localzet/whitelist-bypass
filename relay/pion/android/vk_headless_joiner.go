@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/pion"
-	joiner "whitelist-bypass/relay/pion/headless-joiner-common"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/pion"
+	joiner "vconnect/relay/pion/headless-joiner-common"
+	"vconnect/relay/tunnel"
 )
 
 type fileCacheStore struct {
@@ -22,7 +22,7 @@ func newFileCacheStore() *fileCacheStore {
 	if dir == "" {
 		dir = os.TempDir()
 	}
-	cacheDir := filepath.Join(dir, "whitelist-bypass")
+	cacheDir := filepath.Join(dir, "vconnect")
 	os.MkdirAll(cacheDir, 0755)
 	return &fileCacheStore{dir: cacheDir}
 }

@@ -82,7 +82,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: prebuilts/whitelist-bypass.apk
+          path: prebuilts/vconnect.apk
           if-no-files-found: error
 
   cli:
@@ -108,7 +108,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: cli-bundles
-          path: prebuilts/whitelist-bypass-cli-*.zip
+          path: prebuilts/vconnect-cli-*.zip
           if-no-files-found: error
 
   creator:
@@ -162,7 +162,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          VERSION_LDFLAGS="-s -w -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
+          VERSION_LDFLAGS="-s -w -X vconnect/relay/common.Version=$RELEASE_VERSION"
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C relay build -trimpath -ldflags="$VERSION_LDFLAGS" -o "relay-bundle${{ matrix.ext }}" .
           for component in vk telemost wbstream dion; do
             GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go -C "headless/$component" build -trimpath -ldflags="$VERSION_LDFLAGS" -o "../headless-$component-bundle${{ matrix.ext }}" .
@@ -242,7 +242,7 @@ jobs:
         run: |
           set -euo pipefail
           cd joiner-desktop-app/desktop-joiner
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags="-s -w -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION" -o "desktop-joiner-bundle${{ matrix.ext }}" .
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -trimpath -ldflags="-s -w -X vconnect/relay/common.Version=$RELEASE_VERSION" -o "desktop-joiner-bundle${{ matrix.ext }}" .
           if [ "${{ matrix.platform }}" = "win" ]; then
             curl -L -o wintun.zip https://www.wintun.net/builds/wintun-0.14.1.zip
             7z e -y wintun.zip "wintun/bin/${{ matrix.wintun_arch }}/wintun.dll" >/dev/null
@@ -297,7 +297,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: prebuilts/whitelist-bypass-proxy.ipa
+          path: prebuilts/vconnect-proxy.ipa
           if-no-files-found: error
 
   release:

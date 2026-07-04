@@ -1,4 +1,4 @@
-# Whitelist Bypass
+# VConnect
 
 Tunnels internet traffic through video calling platforms (VK Call, Yandex Telemost, WB Stream) to bypass government whitelist censorship.
 
@@ -53,7 +53,7 @@ Traffic goes through the platform's SFU, which is on the government whitelist. T
 - `headless/wbstream-joiner/` - Desktop WB Stream joiner (counterpart to the creator, used for tests and Linux clients)
 - `headless/telemost-joiner/` - Desktop Telemost joiner (counterpart to the creator, used for tests and Linux clients)
 - `headless/vk-bot/` - Standalone VK Long Poll bot that spawns headless creators on demand and replies with the join link (server-side alternative to the Electron bot)
-- `headless/creator-service/` - Call-carried server control plane that creates one work call per client and selected egress; deployable as `whitelist-bypass-creator-service` from GHCR
+- `headless/creator-service/` - Call-carried server control plane that creates one work call per client and selected egress; deployable as `vconnect-creator-service` from GHCR
 - `headless/tests/` - End-to-end smoke tests for each platform
 - `android-app/` - Android joiner: VpnService + tun2socks + headless Pion (primary path); also retains a `WebView` fallback for the legacy browser flow
 - `ios-proxy-app/` - iOS joiner: SOCKS5 + headless Pion via the gomobile xcframework
@@ -80,8 +80,8 @@ Download and run the Electron app from [GitHub Releases](../../releases). It bun
 
 Three forms are available; pick whichever fits the device:
 
-- **Android** - install `whitelist-bypass.apk` from [Releases](../../releases). Allow the VPN prompt on first launch. Paste the join link and tap GO; system-wide traffic flows through the call.
-- **iOS** - install `whitelist-bypass-proxy.ipa` from [Releases](../../releases) (sideload via AltStore / Sideloadly / your dev account). Exposes a local SOCKS5 proxy only - no system VPN. To proxy the whole device, point any SOCKS5-capable VPN app (Shadowrocket, Streisand, ...) at the SOCKS5 endpoint the app shows; or set the proxy per app (Telegram has built-in support).
+- **Android** - install `vconnect.apk` from [Releases](../../releases). Allow the VPN prompt on first launch. Paste the join link and tap GO; system-wide traffic flows through the call.
+- **iOS** - install `vconnect-proxy.ipa` from [Releases](../../releases) (sideload via AltStore / Sideloadly / your dev account). Exposes a local SOCKS5 proxy only - no system VPN. To proxy the whole device, point any SOCKS5-capable VPN app (Shadowrocket, Streisand, ...) at the SOCKS5 endpoint the app shows; or set the proxy per app (Telegram has built-in support).
 - **Linux desktop** - run a headless joiner; it exposes a SOCKS5 proxy on the given port for whatever you point at it. Useful for servers and Linux clients. Optional `--socks-user` / `--socks-pass` enable SOCKS5 username/password auth.
   - WB Stream: `headless-wbstream-joiner --room <link> --socks-port 1080 [--socks-user u --socks-pass p]`
   - Telemost: `headless-telemost-joiner --tm-link <link> --socks-port 1080 [--socks-user u --socks-pass p]`
@@ -123,7 +123,7 @@ Requires Xcode and macOS.
 ./build-ios.sh
 ```
 
-This builds `Mobile.xcframework` into `ios-proxy-app/`. Then open `ios-proxy-app/whitelist-bypass-proxy.xcodeproj` in Xcode, select your signing team in Signing & Capabilities, and build to device.
+This builds `Mobile.xcframework` into `ios-proxy-app/`. Then open `ios-proxy-app/vconnect-proxy.xcodeproj` in Xcode, select your signing team in Signing & Capabilities, and build to device.
 
 Before committing, run `ios-proxy-app/strip-signing.sh` to remove your Apple developer team ID from the project.
 
@@ -139,8 +139,8 @@ Output in `prebuilts/`:
 | `VConnect Creator-*-x64.exe` | Windows x64 |
 | `VConnect Creator-*-ia32.exe` | Windows x86 |
 | `VConnect Creator-*.AppImage` | Linux x64 |
-| `whitelist-bypass.apk` | Android |
-| `whitelist-bypass-proxy.ipa` | iOS, unsigned |
+| `vconnect.apk` | Android |
+| `vconnect-proxy.ipa` | iOS, unsigned |
 | `headless-vk-creator-linux-x64` | Linux x64 |
 | `headless-vk-creator-linux-ia32` | Linux x86 |
 | `headless-telemost-creator-linux-x64` | Linux x64 |
@@ -221,7 +221,7 @@ Mutually exclusive with the call-creation flags (`--peer-id` for VK; the others 
 ```sh
 ./headless-vk-creator --cookies cookies-vk.json --vk-link https://vk.com/call/join/<token> \
   --resources custom --read-buf 65536 --max-dc-buf 8388608 --mem-limit 268435456 \
-  --write-file /var/run/whitelist-bypass/call.txt
+  --write-file /var/run/vconnect/call.txt
 ```
 
 - `read-buf` - TCP/DC read buffer size. Smaller = more frequent backpressure checks, less bursty memory

@@ -8,7 +8,7 @@ WORKDIR /src
 COPY relay /src/relay
 COPY headless /src/headless
 
-RUN LDFLAGS="-s -w -X whitelist-bypass/relay/common.Version=${RELEASE_VERSION}" \
+RUN LDFLAGS="-s -w -X vconnect/relay/common.Version=${RELEASE_VERSION}" \
  && go -C /src/headless/vk build -trimpath -ldflags="$LDFLAGS" -o /out/headless-vk-creator . \
  && go -C /src/headless/telemost build -trimpath -ldflags="$LDFLAGS" -o /out/headless-telemost-creator . \
  && go -C /src/headless/wbstream build -trimpath -ldflags="$LDFLAGS" -o /out/headless-wbstream-creator . \

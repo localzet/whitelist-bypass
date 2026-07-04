@@ -17,10 +17,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/egress"
-	tmapi "whitelist-bypass/relay/telemost"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/egress"
+	tmapi "vconnect/relay/telemost"
+	"vconnect/relay/tunnel"
 )
 
 const (

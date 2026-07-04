@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"whitelist-bypass/relay/egress"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/egress"
+	"vconnect/relay/tunnel"
 )
 
 type testDialer struct {

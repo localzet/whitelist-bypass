@@ -4,9 +4,9 @@ import (
 	"log"
 	"strings"
 
-	"whitelist-bypass/relay/common"
-	joiner "whitelist-bypass/relay/pion/headless-joiner-common"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	joiner "vconnect/relay/pion/headless-joiner-common"
+	"vconnect/relay/tunnel"
 )
 
 type DionHeadlessJoiner struct {

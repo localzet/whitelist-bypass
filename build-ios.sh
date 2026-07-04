@@ -5,7 +5,7 @@ export PATH="$PATH:/opt/homebrew/bin:$HOME/go/bin"
 if [ -z "${GOMOBILE_LDFLAGS:-}" ]; then
     GOMOBILE_LDFLAGS="-s -w -checklinkname=0"
 fi
-[ -n "${RELEASE_VERSION:-}" ] && GOMOBILE_LDFLAGS="$GOMOBILE_LDFLAGS -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
+[ -n "${RELEASE_VERSION:-}" ] && GOMOBILE_LDFLAGS="$GOMOBILE_LDFLAGS -X vconnect/relay/common.Version=$RELEASE_VERSION"
 
 command -v go >/dev/null || { echo "go not found"; exit 1; }
 command -v gomobile >/dev/null || { echo "gomobile not found, run: go install golang.org/x/mobile/cmd/gomobile@latest"; exit 1; }
@@ -14,8 +14,8 @@ command -v xcodebuild >/dev/null || { echo "xcodebuild not found, install Xcode 
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 APP_BUILD_DIR="$ROOT/ios-proxy-app/build/Debug-iphoneos"
-APP_PATH="$APP_BUILD_DIR/whitelist-bypass-proxy.app"
-IPA_PATH="$ROOT/prebuilts/whitelist-bypass-proxy.ipa"
+APP_PATH="$APP_BUILD_DIR/vconnect-proxy.app"
+IPA_PATH="$ROOT/prebuilts/vconnect-proxy.ipa"
 
 echo "Building gomobile .xcframework for iOS..."
 cd "$ROOT/relay"
@@ -29,8 +29,8 @@ echo "Building .app via xcodebuild..."
 cd "$ROOT/ios-proxy-app"
 rm -rf "$APP_BUILD_DIR"
 xcodebuild \
-    -project whitelist-bypass-proxy.xcodeproj \
-    -scheme whitelist-bypass-proxy \
+    -project vconnect-proxy.xcodeproj \
+    -scheme vconnect-proxy \
     -configuration Debug \
     -sdk iphoneos \
     -destination 'generic/platform=iOS' \
@@ -49,8 +49,8 @@ trap 'rm -rf "$TEMP_DIR"' EXIT
 mkdir -p "$TEMP_DIR/Payload"
 cp -r "$APP_PATH" "$TEMP_DIR/Payload/"
 
-codesign --remove-signature "$TEMP_DIR/Payload/whitelist-bypass-proxy.app/whitelist-bypass-proxy" 2>/dev/null || true
-find "$TEMP_DIR/Payload/whitelist-bypass-proxy.app/Frameworks" -mindepth 2 -maxdepth 2 -type f ! -name "Info.plist" -exec codesign --remove-signature {} \; 2>/dev/null || true
+codesign --remove-signature "$TEMP_DIR/Payload/vconnect-proxy.app/vconnect-proxy" 2>/dev/null || true
+find "$TEMP_DIR/Payload/vconnect-proxy.app/Frameworks" -mindepth 2 -maxdepth 2 -type f ! -name "Info.plist" -exec codesign --remove-signature {} \; 2>/dev/null || true
 
 rm -f "$IPA_PATH"
 cd "$TEMP_DIR"

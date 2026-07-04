@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/tunnel"
-	"whitelist-bypass/relay/wbstream"
+	"vconnect/relay/common"
+	"vconnect/relay/tunnel"
+	"vconnect/relay/wbstream"
 )
 
 const (

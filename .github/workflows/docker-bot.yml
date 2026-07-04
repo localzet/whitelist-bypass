@@ -39,7 +39,7 @@ jobs:
       - uses: docker/metadata-action@v5
         id: meta
         with:
-          images: ghcr.io/${{ github.repository_owner }}/whitelist-bypass-bot
+          images: ghcr.io/${{ github.repository_owner }}/vconnect-bot
           tags: |
             type=ref,event=tag
             type=raw,value=latest

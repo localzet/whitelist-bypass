@@ -2,7 +2,7 @@ module headless-wbstream-joiner
 
 go 1.26.1
 
-require whitelist-bypass/relay v0.0.0
+require vconnect/relay v0.0.0
 
 require (
 	github.com/google/uuid v1.6.0 // indirect
@@ -30,4 +30,4 @@ require (
 	golang.org/x/time v0.11.0 // indirect
 )
 
-replace whitelist-bypass/relay => ../../relay
+replace vconnect/relay => ../../relay

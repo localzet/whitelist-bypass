@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
+	"vconnect/relay/common"
 )
 
 const (

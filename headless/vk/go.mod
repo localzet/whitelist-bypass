@@ -6,10 +6,10 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/pion/rtp v1.10.1
 	github.com/pion/webrtc/v4 v4.2.11
-	whitelist-bypass/relay v0.0.0
+	vconnect/relay v0.0.0
 )
 
-replace whitelist-bypass/relay => ../../relay
+replace vconnect/relay => ../../relay
 
 require (
 	github.com/google/uuid v1.6.0 // indirect

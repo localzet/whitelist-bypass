@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/tunnel"
 )
 
 type SessionController interface {

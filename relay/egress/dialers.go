@@ -4,7 +4,7 @@ import (
 	"net"
 	"time"
 
-	"whitelist-bypass/relay/common"
+	"vconnect/relay/common"
 )
 
 type DirectDialer struct {

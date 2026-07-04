@@ -16,8 +16,8 @@ echo "Building release APK..."
 APK="app/build/outputs/apk/release/app-release.apk"
 if [ -f "$APK" ]; then
     mkdir -p "$ROOT/prebuilts"
-    cp "$APK" "$ROOT/prebuilts/whitelist-bypass.apk"
-    echo "APK ready: prebuilts/whitelist-bypass.apk ($(du -h "$ROOT/prebuilts/whitelist-bypass.apk" | cut -f1))"
+    cp "$APK" "$ROOT/prebuilts/vconnect.apk"
+    echo "APK ready: prebuilts/vconnect.apk ($(du -h "$ROOT/prebuilts/vconnect.apk" | cut -f1))"
 else
     echo "Build failed, APK not found"
     exit 1

@@ -6,7 +6,7 @@ services:
       dockerfile: docker-build/Dockerfile
     working_dir: /workspace
     volumes:
-      - ../:/workspace/whitelist-bypass
+      - ../:/workspace/vconnect
       - ./build-all.sh:/opt/build_all/build-all.sh
       - android-sdk-cache:/opt/android-sdk
       - android-gradle-cache:/opt/gradle

@@ -15,13 +15,13 @@ require(versionMajor <= 210 && versionMinor <= 99 && versionPatch <= 99) {
 val versionBuild = (System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 0).coerceIn(0, 999)
 
 android {
-    namespace = "bypass.whitelist"
+    namespace = "app.vconnect"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "bypass.whitelist"
+        applicationId = "app.vconnect"
         minSdk = 23
         targetSdk = 36
         versionCode = 10_000_000 * versionMajor + 100_000 * versionMinor + 1_000 * versionPatch + versionBuild

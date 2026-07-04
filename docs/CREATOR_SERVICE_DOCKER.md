@@ -1,6 +1,6 @@
 # Creator service в Docker
 
-Образ `ghcr.io/<owner>/whitelist-bypass-creator-service` создаёт служебный звонок в Telemost и принимает `CookieSubmit`/`SessionCreate` только через его VP8-туннель. Отдельный HTTP/WebSocket API между клиентом и сервером не используется.
+Образ `ghcr.io/<owner>/vconnect-creator-service` создаёт служебный звонок в Telemost и принимает `CookieSubmit`/`SessionCreate` только через его VP8-туннель. Отдельный HTTP/WebSocket API между клиентом и сервером не используется.
 
 ## Подготовка
 

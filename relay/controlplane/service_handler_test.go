@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/tunnel"
 )
 
 type fakeDataTunnel struct {

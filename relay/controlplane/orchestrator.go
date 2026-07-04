@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"whitelist-bypass/relay/egress"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/egress"
+	"vconnect/relay/tunnel"
 )
 
 type WorkCallRequest struct {

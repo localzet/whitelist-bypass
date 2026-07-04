@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
+	"vconnect/relay/common"
 )
 
 var stdinReader = bufio.NewReader(os.Stdin)

@@ -1,4 +1,4 @@
-module whitelist-bypass/relay
+module vconnect/relay
 
 go 1.26.1
 

@@ -10,7 +10,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 HEADLESS="$ROOT/headless"
 PREBUILTS="$ROOT/prebuilts"
 VERSION_LDFLAGS="-s -w"
-[ -n "${RELEASE_VERSION:-}" ] && VERSION_LDFLAGS="$VERSION_LDFLAGS -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
+[ -n "${RELEASE_VERSION:-}" ] && VERSION_LDFLAGS="$VERSION_LDFLAGS -X vconnect/relay/common.Version=$RELEASE_VERSION"
 mkdir -p "$PREBUILTS"
 
 # entry format is sourceDir:outputBinaryName
@@ -30,7 +30,7 @@ build_target() {
     arch_label="$2"
     goarch="$3"
     stage="$PREBUILTS/stage-$goos-$arch_label"
-    zip_path="$PREBUILTS/whitelist-bypass-cli-$goos-$arch_label.zip"
+    zip_path="$PREBUILTS/vconnect-cli-$goos-$arch_label.zip"
     rm -rf "$stage" "$zip_path"
     mkdir -p "$stage"
 
@@ -51,7 +51,7 @@ build_bundle() {
     family="$1"
     shift
     stage="$PREBUILTS/stage-linux-$family"
-    zip_path="$PREBUILTS/whitelist-bypass-cli-linux-$family.zip"
+    zip_path="$PREBUILTS/vconnect-cli-linux-$family.zip"
     rm -rf "$stage" "$zip_path"
 
     for variant in "$@"; do
@@ -82,4 +82,4 @@ build_target freebsd arm64 arm64
 
 echo ""
 echo "=== Done ==="
-ls -lh "$PREBUILTS"/whitelist-bypass-cli-*.zip
+ls -lh "$PREBUILTS"/vconnect-cli-*.zip

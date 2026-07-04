@@ -10,12 +10,12 @@ import (
 	"strings"
 	"sync"
 
-	"whitelist-bypass/relay/androidbind"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/egress"
-	"whitelist-bypass/relay/pion"
-	"whitelist-bypass/relay/pion/android"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/androidbind"
+	"vconnect/relay/common"
+	"vconnect/relay/egress"
+	"vconnect/relay/pion"
+	"vconnect/relay/pion/android"
+	"vconnect/relay/tunnel"
 )
 
 type stdLogger struct{}

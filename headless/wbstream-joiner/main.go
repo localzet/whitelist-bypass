@@ -9,9 +9,9 @@ import (
 	"runtime/debug"
 	"syscall"
 
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/tunnel"
-	"whitelist-bypass/relay/wbstream"
+	"vconnect/relay/common"
+	"vconnect/relay/tunnel"
+	"vconnect/relay/wbstream"
 )
 
 func main() {

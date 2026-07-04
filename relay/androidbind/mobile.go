@@ -11,8 +11,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	_ "golang.org/x/mobile/bind"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/tunnel"
 )
 
 const (

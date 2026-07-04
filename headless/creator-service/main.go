@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/controlplane"
-	"whitelist-bypass/relay/egress"
-	"whitelist-bypass/relay/tunnel"
-	"whitelist-bypass/relay/wbstream"
+	"vconnect/relay/common"
+	"vconnect/relay/controlplane"
+	"vconnect/relay/egress"
+	"vconnect/relay/tunnel"
+	"vconnect/relay/wbstream"
 )
 
 func main() {

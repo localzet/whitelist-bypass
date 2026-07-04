@@ -17,9 +17,9 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/egress"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/egress"
+	"vconnect/relay/tunnel"
 )
 
 const TopologyDirect = "DIRECT"

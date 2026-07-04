@@ -25,10 +25,10 @@ rm -f "$PREBUILTS"/*.blockmap \
 # electron-builder emits an arch-less duplicate alongside the per-arch
 # files when multiple archs build in one invocation. Drop everything
 # that isn't tagged with x64 / ia32 / arm64.
-for f in "$PREBUILTS"/"WhitelistBypass "*-*.exe \
-         "$PREBUILTS"/"WhitelistBypass "*-*.AppImage \
-         "$PREBUILTS"/"WhitelistBypass "*-*.dmg \
-         "$PREBUILTS"/"WhitelistBypass "*-*.zip; do
+for f in "$PREBUILTS"/"VConnect "*-*.exe \
+         "$PREBUILTS"/"VConnect "*-*.AppImage \
+         "$PREBUILTS"/"VConnect "*-*.dmg \
+         "$PREBUILTS"/"VConnect "*-*.zip; do
     [ -e "$f" ] || continue
     case "$f" in
         *-x64.exe|*-ia32.exe|*-arm64.exe) ;;

@@ -2,7 +2,7 @@ module desktop-joiner
 
 go 1.26.1
 
-require whitelist-bypass/relay v0.0.0
+require vconnect/relay v0.0.0
 
 require (
 	github.com/ajg/form v1.5.1 // indirect
@@ -46,4 +46,4 @@ require (
 	gvisor.dev/gvisor v0.0.0-20250523182742-eede7a881b20 // indirect
 )
 
-replace whitelist-bypass/relay => ../../relay
+replace vconnect/relay => ../../relay

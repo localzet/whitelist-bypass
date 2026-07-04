@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"whitelist-bypass/relay/controlplane"
-	"whitelist-bypass/relay/egress"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/controlplane"
+	"vconnect/relay/egress"
+	"vconnect/relay/tunnel"
 )
 
 type serviceControlOptions struct {

@@ -12,7 +12,7 @@
       "id": "de-fra-1",
       "type": "socks5",
       "address": "10.20.0.11:1080",
-      "username": "whitelist-bypass",
+      "username": "vconnect",
       "passwordEnv": "WB_EGRESS_DE_FRA_1_PASSWORD",
       "enabled": true
     },
@@ -20,7 +20,7 @@
       "id": "nl-ams-1",
       "type": "socks5",
       "address": "10.20.0.12:1080",
-      "username": "whitelist-bypass",
+      "username": "vconnect",
       "passwordEnv": "WB_EGRESS_NL_AMS_1_PASSWORD",
       "enabled": true
     }

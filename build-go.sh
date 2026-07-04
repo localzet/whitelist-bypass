@@ -13,8 +13,8 @@ if [ -z "${GOMOBILE_LDFLAGS:-}" ]; then
 fi
 VERSION_LDFLAGS="-s -w"
 if [ -n "${RELEASE_VERSION:-}" ]; then
-    VERSION_LDFLAGS="$VERSION_LDFLAGS -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
-    GOMOBILE_LDFLAGS="$GOMOBILE_LDFLAGS -X whitelist-bypass/relay/common.Version=$RELEASE_VERSION"
+    VERSION_LDFLAGS="$VERSION_LDFLAGS -X vconnect/relay/common.Version=$RELEASE_VERSION"
+    GOMOBILE_LDFLAGS="$GOMOBILE_LDFLAGS -X vconnect/relay/common.Version=$RELEASE_VERSION"
 fi
 
 # Check deps

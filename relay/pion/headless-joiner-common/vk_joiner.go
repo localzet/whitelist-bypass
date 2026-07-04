@@ -17,8 +17,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/tunnel"
 )
 
 const (

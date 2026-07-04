@@ -12,9 +12,9 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/livekit"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/livekit"
+	"vconnect/relay/tunnel"
 )
 
 type peerEntry struct {

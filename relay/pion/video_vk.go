@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/pion/webrtc/v4"
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/common"
+	"vconnect/relay/tunnel"
 )
 
 type VKClient struct {

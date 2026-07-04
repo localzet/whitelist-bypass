@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/tunnel"
 )
 
 const (

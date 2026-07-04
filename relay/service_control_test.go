@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"whitelist-bypass/relay/tunnel"
+	"vconnect/relay/tunnel"
 )
 
 type serviceFakeTunnel struct {

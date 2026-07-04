@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"whitelist-bypass/relay/common"
-	"whitelist-bypass/relay/egress"
+	"vconnect/relay/common"
+	"vconnect/relay/egress"
 )
 
 const verboseUDPLogging = false
