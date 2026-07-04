@@ -286,10 +286,17 @@ func (b *Bridge) sendInitBundle() {
 		return
 	}
 	b.initBundleSent = true
-	log.Printf("[tm-ws] -> sdkCodecsInfo + updatePublisherTrackDescription")
+	b.sendPublisherDescription("init")
+	b.sendStartupSlotsRamp()
+}
+
+func (b *Bridge) sendPublisherDescription(reason string) {
+	if b.relay == nil || b.relay.pubPC == nil {
+		return
+	}
+	log.Printf("[tm-ws] -> sdkCodecsInfo + updatePublisherTrackDescription reason=%s", reason)
 	b.wsSend(tmapi.SdkCodecsInfoMessage())
 	b.wsSend(tmapi.UpdatePublisherTrackDescriptionMessage(b.relay.pubPC, "Microphone", "MacBook Pro Camera (0000:0001)"))
-	b.sendStartupSlotsRamp()
 }
 
 func (b *Bridge) sendStartupSlotsRamp() {
@@ -581,6 +588,8 @@ func (b *Bridge) applyDescriptionEntry(dm map[string]interface{}) {
 		go b.kickPeer(pid)
 	case !wasKnown:
 		log.Printf("[tm-ws] Participant joined: %s (%s) total=%d", name, pid, total)
+		b.sendPublisherDescription("participant-joined")
+		b.requestVideoSlots()
 	}
 }
 

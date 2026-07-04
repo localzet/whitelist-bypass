@@ -251,18 +251,35 @@ func (j *TelemostHeadlessJoiner) isClosed() bool {
 }
 
 func (j *TelemostHeadlessJoiner) makeHTTPClient() *http.Client {
-	return &http.Client{
-		Timeout: 15 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				host, port, _ := net.SplitHostPort(addr)
-				resolvedIP, err := j.ResolveFn(host)
+	dialer := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+	dialContext := dialer.DialContext
+	if j.ResolveFn != nil {
+		dialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			j.logFn("telemost-joiner: http dial %s", common.MaskAddr(host))
+			if net.ParseIP(host) == nil {
+				host, err = j.ResolveFn(host)
 				if err != nil {
 					return nil, err
 				}
-				return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, resolvedIP+":"+port)
-			},
+				j.logFn("telemost-joiner: http resolved -> %s", common.MaskAddr(host))
+			}
+			return dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
+		}
+	}
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			ForceAttemptHTTP2:     false,
+			DialContext:           dialContext,
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 20 * time.Second,
+			IdleConnTimeout:       60 * time.Second,
 		},
 	}
 }
@@ -572,10 +589,17 @@ func (j *TelemostHeadlessJoiner) sendInitBundle() {
 		return
 	}
 	j.initBundleSent = true
-	j.logFn("telemost-joiner: -> sdkCodecsInfo + updatePublisherTrackDescription")
+	j.sendPublisherDescription("init")
+	j.sendStartupSlotsRamp()
+}
+
+func (j *TelemostHeadlessJoiner) sendPublisherDescription(reason string) {
+	if j.pubPC == nil {
+		return
+	}
+	j.logFn("telemost-joiner: -> sdkCodecsInfo + updatePublisherTrackDescription reason=%s", reason)
 	j.wsSend(tmapi.SdkCodecsInfoMessage())
 	j.wsSend(tmapi.UpdatePublisherTrackDescriptionMessage(j.pubPC, "Microphone", "MacBook Pro Camera (0000:0001)"))
-	j.sendStartupSlotsRamp()
 }
 
 func (j *TelemostHeadlessJoiner) requestVideoSlots() {
@@ -797,6 +821,7 @@ func (j *TelemostHeadlessJoiner) handleMessage(raw []byte) {
 			}
 		}
 		if hasRemoteParticipant {
+			j.sendPublisherDescription("participant-description")
 			j.scheduleSlotRefresh("participant-description")
 		}
 		j.ack(uid)

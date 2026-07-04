@@ -85,22 +85,7 @@ object PortGuard {
                     }
                 }
             }
-            Log.w(TAG, "Could not find PID for port $port via /proc, trying fuser")
-            try {
-                val fuser = Runtime.getRuntime().exec(arrayOf("fuser", "$port/tcp"))
-                val output = fuser.inputStream.bufferedReader().readText().trim()
-                fuser.waitFor()
-                for (token in output.split("\\s+".toRegex())) {
-                    val pid = token.toIntOrNull() ?: continue
-                    if (pid != myPid && readUid(pid) == myUid) {
-                        Log.w(TAG, "fuser: killing PID $pid for port $port")
-                        Process.killProcess(pid)
-                        return
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "fuser fallback failed: ${e.message}")
-            }
+            Log.w(TAG, "Could not find same-UID PID for port $port via /proc")
         } catch (e: Exception) {
             Log.e(TAG, "killByPort error: ${e.message}")
         }
