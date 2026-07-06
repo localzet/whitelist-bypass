@@ -46,7 +46,7 @@
 			exceptions = (
 				CE000001AAAAAAAA00000001 /* Exceptions for "vconnect-proxy" folder in "vconnect-proxy" target */,
 			);
-			path = "vconnect
+			path = "vconnect-proxy";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
